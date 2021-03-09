@@ -14,9 +14,8 @@ ChaoJoystick::ChaoJoystick() {}
 /**
 *   Standard constructor takes two arguments for x, y deadzone constants
 **/
-ChaoJoystick::ChaoJoystick(double xDeadZone, double yDeadZone) : xdz(xDeadZone), ydz(yDeadZone) {
-    this->xdz = xDeadZone;
-    this->ydz = yDeadZone;
+ChaoJoystick::ChaoJoystick(double x0Deadzone, double y0Deadzone, double x1Deadzone, double y1Deadzone) : x0_dz(x0Deadzone), y0_dz(y0Deadzone), x1_dz(x1Deadzone), y1_dz(y1Deadzone) {
+    ;// initialize PS4 Controller
 }
 
 /**
@@ -24,24 +23,22 @@ ChaoJoystick::ChaoJoystick(double xDeadZone, double yDeadZone) : xdz(xDeadZone),
  * Return : std::pair<double, double>, output
  **/
 std::pair<double, double> ChaoJoystick::getAxisOutput(int axis) {
-    double x_raw, x_v;
-    double y_raw, y_v;
-    std::pair<double, double> axisOutput( ((abs(x_raw - xdz) > 0) ? x_raw : 0.0),  ((abs(y_raw - ydz) > 0) ? y_raw : 0) );
+    double x_raw, y_raw;
+    std::pair<double, double> axisOutput;
+    if (axis == 0) {
+        // Get axis raw values x_raw, y_raw here -- 
+        axisOutput = std::make_pair(((abs(x_raw - x0_dz) > 0) ? x_raw : 0.0),  ((abs(y_raw - y0_dz) > 0) ? y_raw : 0));
+    }
+    else{
+        // Get axis raw values x_raw, y_raw here -- 
+        axisOutput = std::make_pair(((abs(x_raw - x1_dz) > 0) ? x_raw : 0.0),  ((abs(y_raw - y1_dz) > 0) ? y_raw : 0));
+    }
     return axisOutput;
 }
 
 /**
  * 
  **/
-std::pair<double, double> ChaoJoystick::getDeadZone(){
-    std::pair<double, double> output(this->xdz, this->ydz);
-    return output;
-}
-
-/**
- * 
- **/
 int main(){
-    ChaoJoystick joy(10, 10);
-    printf("test\n");
+    
 }
