@@ -34,7 +34,7 @@ std::pair<double, double> ChaoJoystick::getAxisOutput(int axis) {
         axisOutput = std::make_pair(((abs(x_raw - x1_dz) > 0) ? x_raw : 0.0),  ((abs(y_raw - y1_dz) > 0) ? y_raw : 0));
     }
     else {
-        std::cout << "Usage: expected <int> axis 0 or 1" << endl;
+        std::cout << "Usage: expected <int> axis 0 or 1" << std::endl;
         return axisOutput;
     }
     return axisOutput;
