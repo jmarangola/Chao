@@ -29,9 +29,13 @@ std::pair<double, double> ChaoJoystick::getAxisOutput(int axis) {
         // Get axis raw values x_raw, y_raw here -- 
         axisOutput = std::make_pair(((abs(x_raw - x0_dz) > 0) ? x_raw : 0.0),  ((abs(y_raw - y0_dz) > 0) ? y_raw : 0));
     }
-    else{
+    else if (axis == 0) {
         // Get axis raw values x_raw, y_raw here -- 
         axisOutput = std::make_pair(((abs(x_raw - x1_dz) > 0) ? x_raw : 0.0),  ((abs(y_raw - y1_dz) > 0) ? y_raw : 0));
+    }
+    else {
+        std::cout << "Usage: expected <int> axis 0 or 1" << endl;
+        return axisOutput;
     }
     return axisOutput;
 }
