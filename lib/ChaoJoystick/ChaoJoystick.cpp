@@ -16,7 +16,7 @@ ChaoJoystick::ChaoJoystick() {}
 /**
 *   Standard constructor takes two arguments for x, y deadzone constants
 **/
-ChaoJoystick::ChaoJoystick(double x0Deadzone, double y0Deadzone, double x1Deadzone, double y1Deadzone) : x0_dz(x0Deadzone), y0_dz(y0Deadzone), x1_dz(x1Deadzone), y1_dz(y1Deadzone) {
+ChaoJoystick::ChaoJoystick(double x0Deadzone, double y0Deadzone, double x1Deadzone, double y1Deadzone) : x0Dz(x0Deadzone), y0Dz(y0Deadzone), x1Dz(x1Deadzone), y1Dz(y1Deadzone) {
     init();// initialize PS4 Controller
 }
 
@@ -28,27 +28,36 @@ void ChaoJoystick::init() {
  * Returns axis output with deadzone for a joystick
  * Return : std::pair<double, double>, output
  **/
-std::vector<double> ChaoJoystick::getAxisOutput() {
+void ChaoJoystick::getAxisInput(double *joystickInput) {
     double xRaw0=this->joystickValues[0], yRaw0=this->joystickValues[1], xRaw1=this->joystickValues[2], yRaw1=this->joystickValues[3];
-    std::vector<double> axisOutput(2);
+    double normalizedInput[4];
     if (PS4.isConnected()){
-        if (PS4.event.analog_move.stick.lx) 
+        if (PS4.event.analog_move.stick.lx) {
             xRaw0 = (double) PS4.data.analog.stick.lx;
-        if (PS4.event.analog_move.stick.ly) 
+            normalizedInput[0] = (abs(xRaw0 - x0Dz) > 0) ? xRaw0 : 0.0;
+        }
+        if (PS4.event.analog_move.stick.ly) {
             yRaw0 = (double) PS4.data.analog.stick.lx;
-        if (PS4.event.analog_move.stick.rx) 
+            normalizedInput[1] = (abs(yRaw0 - y0Dz) > 0) ? yRaw0 : 0.0;
+        }
+        if (PS4.event.analog_move.stick.rx) {
             xRaw1 = (double) PS4.data.analog.stick.rx;
-        if (PS4.event.analog_move.stick.ry) 
+            normalizedInput[2] = (abs(xRaw1 - x1Dz) > 0) ? xRaw1 : 0.0;
+        }
+        if (PS4.event.analog_move.stick.ry) {
             yRaw1 = (double) PS4.data.analog.stick.ry; 
-        axisOutput.push_back(((abs(xRaw0 - x0_dz) > 0) ? xRaw0 : 0.0));
-        axisOutput.push_back(((abs(yRaw0 - y0_dz) > 0) ? yRaw0 : 0.0));
-        axisOutput.push_back(((abs(xRaw1 - x1_dz) > 0) ? xRaw1 : 0.0));
-        axisOutput.push_back(((abs(yRaw1 - y1_dz) > 0) ? yRaw1 : 0.0));
+            normalizedInput[3] = (abs(yRaw1 - y1Dz) > 0) ? yRaw1 : 0.0;
+        }
+        // Normalize joystick inputs to percentage of maximum velocity by X: Z -> R [-1, 1]
+        for (int i = 0; i < 4; i++){
+            if (normalizedInput[i] == 0)
+                continue;
+            normalizedInput[i] = (normalizedInput[i] > 0) ? (JOY_UPPER - normalizedInput[i])/JOY_UPPER : (JOY_LOWER - normalizedInput[i])/JOY_LOWER;
+        }
     }
     else {
         Serial.println("Not connected.");
-        return axisOutput;
     }
-    this->joystickValues = axisOutput;
-    return axisOutput;
+    joystickInput = normalizedInput;
+    //joystickValues = joystickInput;
 }
