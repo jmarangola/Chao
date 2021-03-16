@@ -59,5 +59,5 @@ void ChaoJoystick::getAxisInput(double *joystickInput) {
         Serial.println("Not connected.");
     }
     joystickInput = normalizedInput;
-    //joystickValues = joystickInput;
+    joystickValues = joystickInput;
 }

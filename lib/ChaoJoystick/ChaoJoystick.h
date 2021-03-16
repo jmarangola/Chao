@@ -7,7 +7,7 @@
 class ChaoJoystick{
     private:
         double x0Dz, y0Dz, x1Dz, y1Dz;
-        double joystickValues[4];
+        double *joystickValues;
     public:
         ChaoJoystick();
         ChaoJoystick(double x0Deadzone, double y0Deadzone, double x1Deadzone, double y1Deadzone);
