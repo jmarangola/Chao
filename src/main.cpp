@@ -59,29 +59,36 @@ void loop() {
 #include <Arduino.h>
 #include <PS4Controller.h>
 #include <ChaoJoystick.h>
+#include <utility>
 
-ChaoJoystick Joystick(1, 1);
-double value;
+ChaoJoystick Joystick(3, 3, 3, 3);
+double ry, rx, ly, lx;
+
 void setup() {
     Serial.begin(115200);
     //const char *addr =" 01:01:01:01:01:01"
     PS4.begin("01:01:01:01:01:01");
     Serial.println("Ready.");
-
+    
 }
 
 void loop() {
  		// Below has all accessible outputs from the controller
-    if (PS4.isConnected()){
-      if ( PS4.event.analog_move.stick.ry ) {
-					Serial.print("Right Stick y at ");
-					//Serial.println(PS4.data.analog.stick.ry, DEC);
-			}
-      value = (double) PS4.data.analog.stick.ry;
-      Serial.println(value);
+    
+   
+					
+          
+          
+          
+			 
+      //value = (double) PS4.data.analog.stick.ry;
+      //value = Joystick.getAxisOutput(1).second;
+      //Serial.println(Joystick.getAxisOutput(-1).second);
+    
+      //Serial.println(value);
 		 // This delay is to make the Serial Print more human readable
 		 // Remove it when you're not trying to see the output
      delay(100);
-    }
+    
     
 }
