@@ -14,4 +14,5 @@ class ChaoJoystick{
         void getAxisInput(double *joystickInput);
         void setDeadZone(double x, double y);
         void init();
+        void tankDrive();
 };
