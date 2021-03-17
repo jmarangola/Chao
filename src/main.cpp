@@ -5,9 +5,11 @@
 #define GYROSCOPE_S 65.6
 #define dT_MICROSECONDS 5000
 #define dT dT_MICROSECONDS/1000000.0
+#define STABLE_STATE_DELTA_THETA 0.05
+#define EMA_ALPHA 0.80
 
 MPU6050 IMU1;
-float gyroscopeOffsets[3];
+float gyroscopeOffsets[3], thetaOld;
 
 void setup(){
   Serial.begin(115200);
@@ -36,10 +38,18 @@ void computeGyroOffsets(int8_t N = 100) {
   gyroscopeOffsets[1] /= N;
   gyroscopeOffsets[2] /= N;
 }
-void loop(){
-  computeGyroOffsets();
+
+void emaLowPass(float &accAngle, float &thetaPrimeFiltered, float thetaOld){
   IMU1.getMotion6(&gyrX, &gyrY, &gyrZ, &aX, &aY, &aZ);
   accAngle = atan2f((float) aY, (float) aZ) * 180.0/(2.0*acos(0.0)) - 2;
-  deltaGyroAngle = ((float)((gyrX - gyroscopeOffsets[0])) / GYROSCOPE_S) * dT;
-  Serial.println(accAngle);
+  thetaPrimeFiltered = ((float)((gyrX - gyroscopeOffsets[0])) / GYROSCOPE_S) * dT;
+  thetaPrimeFiltered = ((EMA_ALPHA * thetaOld) +  thetaPrimeFiltered * (1 - EMA_ALPHA));
+}
+
+float accAng = 0.0, thetaAngle = 0.0, thetOld = 0.0;
+void loop(){
+  computeGyroOffsets();
+  emaLowPass(accAngle, thetaAngle, thetOld);
+  Serial.println(thetaAngle);
+  thetOld = thetaAngle;
 }
