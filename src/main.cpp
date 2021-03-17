@@ -7,7 +7,7 @@
 #define dT dT_MICROSECONDS/1000000.0
 
 MPU6050 IMU1;
-
+float gyroscopeOffsets[3];
 
 void setup(){
   Serial.begin(115200);
@@ -24,15 +24,22 @@ float deltaGyroAngle, accAngle;
 float gXSum = 0.0;
 int16_t gyrX, gyrY, gyrZ, aX, aY, aZ, oX, oY, oZ;
 
-void loop(){
+void computeGyroOffsets(int8_t N = 100) {
   for (int i = 0; i <= 100; i++){
     IMU1.getRotation(&oX, &oY, &oZ);
-    gXSum += oX;
+    gyroscopeOffsets[0] += oX;
+    gyroscopeOffsets[1] += oY;
+    gyroscopeOffsets[2] += oZ;
     delay(5);
   }
-  gXSum /= 100;
+  gyroscopeOffsets[0] /= N;
+  gyroscopeOffsets[1] /= N;
+  gyroscopeOffsets[2] /= N;
+}
+void loop(){
+  computeGyroOffsets();
   IMU1.getMotion6(&gyrX, &gyrY, &gyrZ, &aX, &aY, &aZ);
   accAngle = atan2f((float) aY, (float) aZ) * 180.0/(2.0*acos(0.0)) - 2;
-  deltaGyroAngle = ((float)((gyrX - gXSum)) / GYROSCOPE_S) * dT;
-  Serial.println(deltaGyroAngle);
+  deltaGyroAngle = ((float)((gyrX - gyroscopeOffsets[0])) / GYROSCOPE_S) * dT;
+  Serial.println(accAngle);
 }
