@@ -77,5 +77,8 @@ void loop(){
   emaLowPass(accAngle, thetaAngle, thetOld);
   Serial.println(thetaAngle);
   thetOld = thetaAngle;*/
-  ;
+  
+  stepperLeft->setCurrentPosition(0);
+  stepperLeft->move(100);
+
 }
