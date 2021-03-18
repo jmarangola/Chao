@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <MPU6050.h>
 #include <cmath>
+#include <PS4Controller.h>
 #include <FastAccelStepper.h>
 
 #define GYROSCOPE_S 65.6
@@ -10,13 +11,14 @@
 #define EMA_ALPHA 0.80
 
 #define STEP_LEFT_P 19
-#define DIR_LEFT__P 2
+#define DIR_LEFT_P 2
 #define STEP_RIGHT_P 0
 #define DIR RIGHT_P 18
 
 // IMU datum
 MPU6050 IMU1;
 float gyroscopeOffsets[3], thetaOld;
+float joyInput[4] = {0, 0, 0, 0};
 
 // L/R Nema 17 Motors
 FastAccelStepperEngine engine = FastAccelStepperEngine();
@@ -29,11 +31,16 @@ void initMotors(){
   stepperLeft = engine.stepperConnectToPin(STEP_LEFT_P);
   //stepperRight = engine.stepperConnectToPin(STEP_RIGHT_P);
   stepperLeft->setAutoEnable(true);
+
   //stepperRight->setAutoEnable(true);
 }
 
 void setup(){
+
+  PS4.begin("01:01:01:01:01:01");
   Serial.begin(115200);
+  Serial.println("Ready.");
+  pinMode(DIR_LEFT_P, OUTPUT);
   Wire.begin(21,22,400000);
   IMU1.initialize();
   IMU1.setFullScaleGyroRange(MPU6050_GYRO_FS_500);
@@ -42,6 +49,7 @@ void setup(){
   stepperLeft->setAcceleration(50000);
   stepperLeft->rampState();
   stepperLeft->move(10000);
+  stepperLeft->setDirectionPin(DIR_LEFT_P);
 
 }
 
@@ -71,14 +79,52 @@ void emaLowPass(float &accAngle, float &thetaPrimeFiltered, float thetaOld){
   thetaPrimeFiltered = ((EMA_ALPHA * thetaOld) +  thetaPrimeFiltered * (1 - EMA_ALPHA));
 }
 
+void getAxisInput(int x0Dz, int y0Dz, int x1Dz, int y1Dz, float axisInput[]){
+  double xRaw0, yRaw0, xRaw1, yRaw1;
+  if (PS4.isConnected()) {
+        if (PS4.event.analog_move.stick.lx) {
+            xRaw0 = (double) PS4.data.analog.stick.lx;
+            axisInput[0] = (abs(xRaw0) > x0Dz) ? xRaw0 : 0.0;
+            Serial.println(axisInput[0]);
+        }
+        if (PS4.event.analog_move.stick.ly) {
+            yRaw0 = (double) PS4.data.analog.stick.lx;
+            axisInput[1] = (abs(yRaw0) > y0Dz) ? yRaw0 : 0.0;
+        }
+        if (PS4.event.analog_move.stick.rx) {
+            xRaw1 = (double) PS4.data.analog.stick.rx;
+            axisInput[2] = (abs(xRaw1) > x1Dz) ? xRaw1 : 0.0;
+        }
+        if (PS4.event.analog_move.stick.ry) {
+            yRaw1 = (double) PS4.data.analog.stick.ry; 
+            axisInput[3] = (abs(yRaw1) > y1Dz) ? yRaw1 : 0.0;
+        }
+        // Normalize joystick inputs to percentage of maximum velocity by X: Z -> R [-1, 1]
+        /*
+        for (int i = 0; i < 4; i++){
+            if (axisInput[i] == 0)
+                continue;
+            axisInput[i] = (axisInput[i] >= 0) ? (double)(JOY_UPPER - axisInput[i])/JOY_UPPER : (double)(JOY_LOWER - axisInput[i])/JOY_LOWER;
+        }*/
+    }
+    else {
+      //Serial.println("Joystick not connected.");
+    }
+}
+
 float accAng = 0.0, thetaAngle = 0.0, thetOld = 0.0;
 void loop(){
   /*computeGyroOffsets();
   emaLowPass(accAngle, thetaAngle, thetOld);
   Serial.println(thetaAngle);
   thetOld = thetaAngle;*/
-  
-  stepperLeft->setCurrentPosition(0);
-  stepperLeft->move(100);
+  getAxisInput(5, 5, 5, 5, joyInput);
+  stepperLeft->runForward();
+  if (joyInput[0] != 0) {
+    stepperLeft->setSpeed(600*(128/abs(joyInput[0])));
+    stepperLeft->runForward();
+    digitalWrite(DIR_LEFT_P, LOW);
+  }
+
 
 }
