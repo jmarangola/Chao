@@ -100,12 +100,14 @@ void getAxisInput(int x0Dz, int y0Dz, int x1Dz, int y1Dz, float axisInput[]){
             axisInput[3] = (abs(yRaw1) > y1Dz) ? yRaw1 : 0.0;
         }
         // Normalize joystick inputs to percentage of maximum velocity by X: Z -> R [-1, 1]
-        /*
+        
         for (int i = 0; i < 4; i++){
             if (axisInput[i] == 0)
                 continue;
-            axisInput[i] = (axisInput[i] >= 0) ? (double)(JOY_UPPER - axisInput[i])/JOY_UPPER : (double)(JOY_LOWER - axisInput[i])/JOY_LOWER;
-        }*/
+            axisInput[i] = (128 - abs(axisInput[i]))/128;
+            if (axisInput[i] < 0)
+              axisInput[i] *= -1;
+        }
     }
     else {
       //Serial.println("Joystick not connected.");
@@ -121,7 +123,7 @@ void loop(){
   getAxisInput(5, 5, 5, 5, joyInput);
   stepperLeft->runForward();
   if (joyInput[0] != 0) {
-    stepperLeft->setSpeed(600*(128/abs(joyInput[0])));
+    stepperLeft->setSpeed(600/joyInput[0]);
     stepperLeft->runForward();
     digitalWrite(DIR_LEFT_P, LOW);
   }
