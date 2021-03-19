@@ -1,3 +1,8 @@
+/**
+ * Author: John Marangola - marangol@bc.edu
+ * 
+ **/ 
+
 #include <Arduino.h>
 #include <MPU6050.h>
 #include <cmath>
@@ -73,6 +78,10 @@ void computeGyroOffsets(int8_t N = 100) {
   gyroscopeOffsets[2] /= N;
 }
 
+/**
+ * EMA Moving Average Low Pass filter implementation, thetaOld is last value, thetaPrimeFiltered is the 
+ *  resulting value, dT is the differential time unit
+ **/
 void emaLowPass(float &accAngle, float &thetaPrimeFiltered, float thetaOld){
   IMU1.getMotion6(&gyrX, &gyrY, &gyrZ, &aX, &aY, &aZ);
   accAngle = atan2f((float) aY, (float) aZ) * 180.0/(2.0*acos(0.0)) - 2;
@@ -101,7 +110,6 @@ void getAxisInput(int x0Dz, int y0Dz, int x1Dz, int y1Dz, float axisInput[]){
             axisInput[3] = (abs(yRaw1) > y1Dz) ? yRaw1 : 0.0;
         }
         // Normalize joystick inputs to percentage of maximum velocity by X: Z -> R [-1, 1]
-        
         for (int i = 0; i < 4; i++){
             if (axisInput[i] == 0)
                 continue;
@@ -126,26 +134,39 @@ void tankDrive(int &leftSpeed, int &rightSpeed, int maxSpeed) {
   rightSpeed = joyInput[3] * maxSpeed;
 }
 
+/**
+ * Simple slide drive implementation
+ * Max Speed for 1/2 stepping
+ **/ 
 void slideDrive(int &left, int &right, int maxSpeed) {
   getAxisInput(5, 5, 5, 5, joyInput);
+  maxSpeed *= (2/MICROSTEP_RES);
   // Split turning offset evenly amongst two wheels:
   left = (joyInput[1] * maxSpeed) + (TURN_SENSITIVITY * (-1/2) * joyInput[2]); 
   right = (joyInput[1] * maxSpeed) + (TURN_SENSITIVITY * (1/2) * joyInput[2]);
 }
 
+int updateSpeeds(uint16_t left, uint16_t right) {
+  stepperLeft->setSpeed(left);
+  stepperRight->setSpeed(right);
+  if (left > 0)
+    stepperLeft->runForward();
+  else if (left < 0)
+    stepperLeft->runBackward();
+  if (right > 0)
+    stepperRight->runForward();
+  else if (right < 0)
+    stepperRight->runBackward();
+  return ((left > 0) + (right > 0));
+}
+
 float accAng = 0.0, thetaAngle = 0.0, thetOld = 0.0;
 void loop(){
-  /*computeGyroOffsets();
+  computeGyroOffsets();
   emaLowPass(accAngle, thetaAngle, thetOld);
   Serial.println(thetaAngle);
-  thetOld = thetaAngle;*/
-  getAxisInput(5, 5, 5, 5, joyInput);
-  stepperLeft->runForward();
-  if (joyInput[0] != 0) {
-    stepperLeft->setSpeed(600/joyInput[0]);
-    stepperLeft->runForward();
-    //digitalWrite(DIR_LEFT_P, LOW);
-  }
+  thetOld = thetaAngle;
+  
 
 
 }
