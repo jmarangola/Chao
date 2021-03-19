@@ -14,7 +14,8 @@
 #define DIR_LEFT_P 2
 #define STEP_RIGHT_P 0
 #define DIR RIGHT_P 18
-
+#define MICROSTEP_RES 8
+#define TURN_SENSITIVITY 1.0
 // IMU datum
 MPU6050 IMU1;
 float gyroscopeOffsets[3], thetaOld;
@@ -114,6 +115,24 @@ void getAxisInput(int x0Dz, int y0Dz, int x1Dz, int y1Dz, float axisInput[]){
     }
 }
 
+
+/**
+ * Tank drive implementation, modifie integers corresonding to wheel speeds for each wheel
+ * Max speed for 1/2 microstepping resolution
+ **/ 
+void tankDrive(int &leftSpeed, int &rightSpeed, int maxSpeed) {
+  getAxisInput(5, 5, 5, 5, joyInput);
+  leftSpeed = joyInput[1] * maxSpeed;
+  rightSpeed = joyInput[3] * maxSpeed;
+}
+
+void slideDrive(int &left, int &right, int maxSpeed) {
+  getAxisInput(5, 5, 5, 5, joyInput);
+  // Split turning offset evenly amongst two wheels:
+  left = (joyInput[1] * maxSpeed) + (TURN_SENSITIVITY * (-1/2) * joyInput[2]); 
+  right = (joyInput[1] * maxSpeed) + (TURN_SENSITIVITY * (1/2) * joyInput[2]);
+}
+
 float accAng = 0.0, thetaAngle = 0.0, thetOld = 0.0;
 void loop(){
   /*computeGyroOffsets();
@@ -125,7 +144,7 @@ void loop(){
   if (joyInput[0] != 0) {
     stepperLeft->setSpeed(600/joyInput[0]);
     stepperLeft->runForward();
-    digitalWrite(DIR_LEFT_P, LOW);
+    //digitalWrite(DIR_LEFT_P, LOW);
   }
 
 
