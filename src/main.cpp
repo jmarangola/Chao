@@ -141,7 +141,7 @@ void tankDrive(int &leftSpeed, int &rightSpeed, int maxSpeed) {
 void slideDrive(int &left, int &right, int maxSpeed) {
   getAxisInput(5, 5, 5, 5, joyInput);
   maxSpeed *= (2/MICROSTEP_RES);
-  // Split turning offset evenly amongst two wheels:
+  // Distribute turning offset:
   left = (joyInput[1] * maxSpeed) + (TURN_SENSITIVITY * (-1/2) * joyInput[2]); 
   right = (joyInput[1] * maxSpeed) + (TURN_SENSITIVITY * (1/2) * joyInput[2]);
 }
@@ -157,7 +157,7 @@ int updateSpeeds(uint16_t left, uint16_t right) {
     stepperRight->runForward();
   else if (right < 0)
     stepperRight->runBackward();
-  return ((left > 0) + (right > 0));
+  return ((left != 0) + (right != 0));
 }
 
 float accAng = 0.0, thetaAngle = 0.0, thetOld = 0.0;
