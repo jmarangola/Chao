@@ -39,7 +39,7 @@ float PIDController::compute() {
     float outputResult;
     error = setpoint - input;
     proportional = kp*error;
-    
+
     integral += ki*error;
     if (integral > outputMax) 
         integral = outputMax;
