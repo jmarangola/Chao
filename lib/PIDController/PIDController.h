@@ -4,6 +4,7 @@ class PIDController {
         PIDController(float kp, float ki, float kd, int16_t minOutput, int16_t maxOutput, float dt);
 
         void resetAll();
+        void setParameters(float kp, float ki, float kd);
         void resetIntegral();
 
         void init();

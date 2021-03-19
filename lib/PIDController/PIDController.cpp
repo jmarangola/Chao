@@ -39,31 +39,39 @@ float PIDController::compute() {
     float outputResult;
     error = setpoint - input;
     proportional = kp*error;
+    
     integral += ki*error;
-    if (integral > outputMax) integral = outputMax;
-    else if (integral < outputMin) integral = outputMin;
+    if (integral > outputMax) 
+        integral = outputMax;
+    else if (integral < outputMin) 
+        integral = outputMin;
+
     derivative = (error - lastError)*kd/dt;
     outputResult = proportional + integral - derivative;
     if (outputResult > outputMax) 
         outputResult = outputMax;
     else if (outputResult < outputMin)
         outputResult = outputMin;
+
     lastInput = input;
     return outputResult;
 }
 
-void PIDController::resetAll(){
+void PIDController::resetAll() {
     integral = 0.0;
     derivative = 0.0;
     proportional = 0.0;
+    lastError = 0.0;
 }
 
-void PIDController::resetIntegral(){
+void PIDController::resetIntegral() {
     integral = 0.0;
 }
 
-int main(){
-
+void PIDController::setParameters(float kp, float ki, float kd) {
+    this->dt = dt;
+    this->kp = kp;
+    this->ki = ki*dt;
 }
 
 
