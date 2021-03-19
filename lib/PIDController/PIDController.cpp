@@ -47,7 +47,7 @@ float PIDController::compute() {
         integral = outputMin;
 
     derivative = (error - lastError)*kd/dt;
-    outputResult = proportional + integral - derivative;
+    outputResult = proportional + integral + derivative;
     if (outputResult > outputMax) 
         outputResult = outputMax;
     else if (outputResult < outputMin)

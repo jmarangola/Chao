@@ -7,6 +7,7 @@
 #include <MPU6050.h>
 #include <cmath>
 #include <PS4Controller.h>
+#include <PIDController.h>
 #include <FastAccelStepper.h>
 
 #define GYROSCOPE_S 65.6
@@ -20,11 +21,25 @@
 #define STEP_RIGHT_P 0
 #define DIR RIGHT_P 18
 #define MICROSTEP_RES 8
+#define DELTA_T 10000
+
+// Period in uS --> 2pi*10^6/MAXIMUM_SPEED_T = motor angular frequency rad/sec, THIS IS A MAGNITUDE!
+#define MAXIMUM_SPEED_T 400 
 #define TURN_SENSITIVITY 1.0
-// IMU datum
+
+// PID constants:
+#define kp_a 1.0
+#define kd_a 1.0
+#define ki_a 1.0
+
+// IMU related:
 MPU6050 IMU1;
 float gyroscopeOffsets[3], thetaOld;
 float joyInput[4] = {0, 0, 0, 0};
+long currentTime, lastTime;
+
+// PID Objects
+PIDController angle(kp_a, ki_a, kd_a, (int16_t)(-1*MAXIMUM_SPEED_T), (int16_t) MAXIMUM_SPEED_T, DELTA_T);
 
 // L/R Nema 17 Motors
 FastAccelStepperEngine engine = FastAccelStepperEngine();
@@ -162,14 +177,20 @@ int updateSpeeds(uint16_t left, uint16_t right) {
 
 float accAng = 0.0, thetaAngle = 0.0, thetOld = 0.0;
 float speed = 2.0;
+float angleOutput = 0.0;
+
 void loop(){
   computeGyroOffsets();
   emaLowPass(accAngle, thetaAngle, thetOld);
   Serial.println(thetaAngle);
   thetOld = thetaAngle;
-  getAxisInput(5, 5, 5, 5, joyInput);
-  stepperLeft->setSpeed(500);
-  stepperLeft->runBackward();
 
-
+  currentTime = millis();
+  
+  if (currentTime - lastTime > DELTA_T) {
+    angle.input = thetaAngle;
+    angleOutput = angle.compute();
+    
+    lastTime = currentTime;
+  }
 }
