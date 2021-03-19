@@ -161,7 +161,7 @@ void slideDrive(int &left, int &right, int maxSpeed) {
   right = (joyInput[1] * maxSpeed) + (TURN_SENSITIVITY * (1/2) * joyInput[2]);
 }
 
-int updateSpeeds(uint16_t left, uint16_t right) {
+int updatePeriods(int16_t left, int16_t right) {
   stepperLeft->setSpeed(left);
   stepperRight->setSpeed(right);
   if (left > 0)
@@ -173,6 +173,14 @@ int updateSpeeds(uint16_t left, uint16_t right) {
   else if (right < 0)
     stepperRight->runBackward();
   return ((left != 0) + (right != 0));
+}
+
+int updateFrequencies(int16_t left, int16_t right) {
+  return updatePeriods(1/left, 1/right);
+}
+
+int percentSpeed(float pLeft, float pRight) {
+  return updateSpeeds((int16_t) MAXIMUM_SPEED_T/pLeft, (int16_t) MAXIMUM_SPEED_T/pRight);
 }
 
 float accAng = 0.0, thetaAngle = 0.0, thetOld = 0.0;
@@ -190,7 +198,7 @@ void loop(){
   if (currentTime - lastTime > DELTA_T) {
     angle.input = thetaAngle;
     angleOutput = angle.compute();
-    
+    percentSpeed(angleOutput/2, angleOutput/2);
     lastTime = currentTime;
   }
 }
