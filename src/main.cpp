@@ -52,10 +52,10 @@ void setup(){
   IMU1.setFullScaleGyroRange(MPU6050_GYRO_FS_500);
   initMotors();
   stepperLeft->setSpeed(400);  // the parameter is us/step !!!
-  stepperLeft->setAcceleration(50000);
-  stepperLeft->rampState();
-  stepperLeft->move(10000);
+  stepperLeft->setAcceleration(10000);
+  //stepperLeft->rampState();
   stepperLeft->setDirectionPin(DIR_LEFT_P);
+
 
 }
 
@@ -161,12 +161,15 @@ int updateSpeeds(uint16_t left, uint16_t right) {
 }
 
 float accAng = 0.0, thetaAngle = 0.0, thetOld = 0.0;
+float speed = 2.0;
 void loop(){
   computeGyroOffsets();
   emaLowPass(accAngle, thetaAngle, thetOld);
   Serial.println(thetaAngle);
   thetOld = thetaAngle;
-  
+  getAxisInput(5, 5, 5, 5, joyInput);
+  stepperLeft->setSpeed(500);
+  stepperLeft->runBackward();
 
 
 }
