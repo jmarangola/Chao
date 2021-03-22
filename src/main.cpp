@@ -80,6 +80,10 @@ void emaLowPass(float &accAngle, float &thetaPrimeFiltered, float thetaOld){
   thetaPrimeFiltered = ((EMA_ALPHA * thetaOld) +  thetaPrimeFiltered * (1 - EMA_ALPHA));
 }
 
+// Left/right stepper timer functions ---------------------------
+
+// --------------------------------------------
+
 void getAxisInput(int x0Dz, int y0Dz, int x1Dz, int y1Dz, float axisInput[]){
   double xRaw0, yRaw0, xRaw1, yRaw1;
   if (PS4.isConnected()) {
