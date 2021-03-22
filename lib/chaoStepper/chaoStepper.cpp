@@ -2,10 +2,7 @@
 
 class chaoStepper {
     private:
-        __int8_t step;
-
+        __int8_t step, dir;
     public:
 
 };
-
-int main(){}
