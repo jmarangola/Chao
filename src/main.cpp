@@ -8,7 +8,6 @@
 #include <cmath>
 #include <PS4Controller.h>
 #include <PIDController.h>
-#include <FastAccelStepper.h>
 
 #define GYROSCOPE_S 65.6
 #define dT_MICROSECONDS 5000
@@ -23,8 +22,6 @@
 #define MICROSTEP_RES 8
 #define DELTA_T 10000
 
-// Period in uS --> 2pi*10^6/MAXIMUM_SPEED_T = motor angular frequency rad/sec, THIS IS A MAGNITUDE!
-#define MAXIMUM_SPEED_T 400 
 #define TURN_SENSITIVITY 1.0
 
 // PID constants:
@@ -39,22 +36,7 @@ float joyInput[4] = {0, 0, 0, 0};
 long currentTime, lastTime;
 
 // PID Objects
-PIDController angle(kp_a, ki_a, kd_a, (int16_t)(-1*MAXIMUM_SPEED_T), (int16_t) MAXIMUM_SPEED_T, DELTA_T);
-
-// L/R Nema 17 Motors
-FastAccelStepperEngine engine = FastAccelStepperEngine();
-FastAccelStepper *stepperLeft = NULL;
-FastAccelStepper *stepperRight = NULL;
-
-void initMotors(){
-  engine.init();
-  // Initialize FastAccelStepper instances here:
-  stepperLeft = engine.stepperConnectToPin(STEP_LEFT_P);
-  //stepperRight = engine.stepperConnectToPin(STEP_RIGHT_P);
-  stepperLeft->setAutoEnable(true);
-
-  //stepperRight->setAutoEnable(true);
-}
+//PIDController angle(kp_a, ki_a, kd_a, (int16_t)(-1*MAXIMUM_SPEED_T), (int16_t) MAXIMUM_SPEED_T, DELTA_T);
 
 void setup(){
 
@@ -65,12 +47,6 @@ void setup(){
   Wire.begin(21,22,400000);
   IMU1.initialize();
   IMU1.setFullScaleGyroRange(MPU6050_GYRO_FS_500);
-  initMotors();
-  stepperLeft->setSpeed(400);  // the parameter is us/step !!!
-  stepperLeft->setAcceleration(10000);
-  //stepperLeft->rampState();
-  stepperLeft->setDirectionPin(DIR_LEFT_P);
-
 
 }
 
@@ -161,28 +137,6 @@ void slideDrive(int &left, int &right, int maxSpeed) {
   right = (joyInput[1] * maxSpeed) + (TURN_SENSITIVITY * (1/2) * joyInput[2]);
 }
 
-int updatePeriods(int16_t left, int16_t right) {
-  stepperLeft->setSpeed(left);
-  stepperRight->setSpeed(right);
-  if (left > 0)
-    stepperLeft->runForward();
-  else if (left < 0)
-    stepperLeft->runBackward();
-  if (right > 0)
-    stepperRight->runForward();
-  else if (right < 0)
-    stepperRight->runBackward();
-  return ((left != 0) + (right != 0));
-}
-
-int updateFrequencies(int16_t left, int16_t right) {
-  return updatePeriods(1/left, 1/right);
-}
-
-int percentSpeed(float pLeft, float pRight) {
-  return updateSpeeds((int16_t) MAXIMUM_SPEED_T/pLeft, (int16_t) MAXIMUM_SPEED_T/pRight);
-}
-
 float accAng = 0.0, thetaAngle = 0.0, thetOld = 0.0;
 float speed = 2.0;
 float angleOutput = 0.0;
@@ -193,12 +147,12 @@ void loop(){
   Serial.println(thetaAngle);
   thetOld = thetaAngle;
 
-  currentTime = millis();
+  //currentTime = millis();
   
-  if (currentTime - lastTime > DELTA_T) {
-    angle.input = thetaAngle;
+  /*if (currentTime - lastTime > DELTA_T) {
+    //angle.input = thetaAngle;
     angleOutput = angle.compute();
-    percentSpeed(angleOutput/2, angleOutput/2);
     lastTime = currentTime;
-  }
+  }*/
+
 }
