@@ -43,18 +43,12 @@ hw_timer_t *leftMotorTimer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 
 // Left/right motor timer functions
-volatile int lOn = 0;
+volatile int iterations = 0;
+
 void IRAM_ATTR leftTimerFunc() {
   portENTER_CRITICAL_ISR(&timerMux);
-  if (lOn) {
-    digitalWrite(19, 0);
-    lOn = 0;
-  }
-  else {
-    digitalWrite(19, 1);
-    lOn = 1;
-  }
-  timerAlarmWrite(leftMotorTimer, 400, true);
+  iterations++;
+  Serial.println(iterations);
   portEXIT_CRITICAL_ISR(&timerMux);
 }
 
@@ -175,20 +169,6 @@ float speed = 2.0;
 float angleOutput = 0.0;
 
 void loop(){
-  /*
-  computeGyroOffsets();
-  emaLowPass(accAngle, thetaAngle, thetOld);
-  Serial.println(thetaAngle);
-  thetOld = thetaAngle;
-  */
-
-
-  //currentTime = millis();
   
-  /*if (currentTime - lastTime > DELTA_T) {
-    //angle.input = thetaAngle;
-    angleOutput = angle.compute();
-    lastTime = currentTime;
-  }*/
 
 }
