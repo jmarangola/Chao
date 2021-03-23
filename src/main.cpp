@@ -43,22 +43,31 @@ hw_timer_t *leftMotorTimer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 
 // Left/right motor timer functions
+volatile int lOn = 0;
 void IRAM_ATTR leftTimerFunc() {
-  portENTER_CRITICAL(&timerMux);
-  Serial.println("Test");
-  portEXIT_CRITICAL(&timerMux);
+  portENTER_CRITICAL_ISR(&timerMux);
+  if (lOn) {
+    digitalWrite(19, 0);
+    lOn = 0;
+  }
+  else {
+    digitalWrite(19, 1);
+    lOn = 1;
+  }
+  timerAlarmWrite(leftMotorTimer, 400, true);
+  portEXIT_CRITICAL_ISR(&timerMux);
 }
 
 void IRAM_ATTR rightTimerFunc() {
-  portENTER_CRITICAL(&timerMux);
+  portENTER_CRITICAL_ISR(&timerMux);
 
-  portEXIT_CRITICAL(&timerMux);
+  portENTER_CRITICAL_ISR(&timerMux);
 }
 
 
 void setup() {
 
-  PS4.begin("01:01:01:01:01:01");
+  //PS4.begin("01:01:01:01:01:01");
   Serial.begin(115200);
   Serial.println("Ready.");
   pinMode(DIR_LEFT_P, OUTPUT);
@@ -68,8 +77,9 @@ void setup() {
   // Setup hw timers:
   leftMotorTimer = timerBegin(0, 80, true);
   timerAttachInterrupt(leftMotorTimer, &leftTimerFunc, true);
-  timerAlarmWrite(leftMotorTimer, 1000000, true);
+  timerAlarmWrite(leftMotorTimer, 400, true);
   timerAlarmEnable(leftMotorTimer);
+  pinMode(19, OUTPUT);
 
 }
 
@@ -165,10 +175,13 @@ float speed = 2.0;
 float angleOutput = 0.0;
 
 void loop(){
+  /*
   computeGyroOffsets();
   emaLowPass(accAngle, thetaAngle, thetOld);
   Serial.println(thetaAngle);
   thetOld = thetaAngle;
+  */
+
 
   //currentTime = millis();
   
