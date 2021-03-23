@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stdint.h>
 class PIDController {
     public:
         PIDController(float kp, float ki, float kd, int16_t minOutput, int16_t maxOutput, float dt);

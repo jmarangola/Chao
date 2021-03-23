@@ -12,7 +12,7 @@
 #include <iomanip>
 #include <iostream>
 #include <string>
-#include <cmath>
+#include <stdint.h>
 using namespace std;
 
 PIDController::PIDController(float kp, float ki, float kd, int16_t minOutput, int16_t maxOutput, float dt) {

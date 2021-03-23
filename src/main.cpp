@@ -38,7 +38,25 @@ long currentTime, lastTime;
 // PID Objects
 //PIDController angle(kp_a, ki_a, kd_a, (int16_t)(-1*MAXIMUM_SPEED_T), (int16_t) MAXIMUM_SPEED_T, DELTA_T);
 
-void setup(){
+// Hardware clock timers
+hw_timer_t *leftMotorTimer = NULL;
+portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
+
+// Left/right motor timer functions
+void IRAM_ATTR leftTimerFunc() {
+  portENTER_CRITICAL(&timerMux);
+  Serial.println("Test");
+  portEXIT_CRITICAL(&timerMux);
+}
+
+void IRAM_ATTR rightTimerFunc() {
+  portENTER_CRITICAL(&timerMux);
+
+  portEXIT_CRITICAL(&timerMux);
+}
+
+
+void setup() {
 
   PS4.begin("01:01:01:01:01:01");
   Serial.begin(115200);
@@ -47,6 +65,11 @@ void setup(){
   Wire.begin(21,22,400000);
   IMU1.initialize();
   IMU1.setFullScaleGyroRange(MPU6050_GYRO_FS_500);
+  // Setup hw timers:
+  leftMotorTimer = timerBegin(0, 80, true);
+  timerAttachInterrupt(leftMotorTimer, &leftTimerFunc, true);
+  timerAlarmWrite(leftMotorTimer, 1000000, true);
+  timerAlarmEnable(leftMotorTimer);
 
 }
 
@@ -79,10 +102,6 @@ void emaLowPass(float &accAngle, float &thetaPrimeFiltered, float thetaOld){
   thetaPrimeFiltered = ((float)((gyrX - gyroscopeOffsets[0])) / GYROSCOPE_S) * dT;
   thetaPrimeFiltered = ((EMA_ALPHA * thetaOld) +  thetaPrimeFiltered * (1 - EMA_ALPHA));
 }
-
-// Left/right stepper timer functions ---------------------------
-
-// --------------------------------------------
 
 void getAxisInput(int x0Dz, int y0Dz, int x1Dz, int y1Dz, float axisInput[]){
   double xRaw0, yRaw0, xRaw1, yRaw1;
