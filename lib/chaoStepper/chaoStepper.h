@@ -1,17 +1,27 @@
 #include <stdint.h>
-
+#include <Arduino.h>
 class chaoStepper {
         __int8_t step, dir, timerNumber;
         void (*func) ();
+        void IRAM_ATTR pulseFunction();
+        void cycleUpdate();
 
-        enum direction {FORWARD, BACKWARD};
-        direction currentDirection;
+        volatile bool stepState=0;
+        volatile int step;
+        volatile int8_t dir = 0;
+
+        bool timerEnabled = 0;
+
+        const float maxSpeed = 3000.0; 
+        float lastVelocity = 0;
 
         void init();
-        void setDir(direction);
+
 
     public:
         chaoStepper(uint8_t step, uint8_t dir, uint8_t tindex,void (*tfunc)());
+
+        float velocity = 0;
 
 
 };

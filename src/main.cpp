@@ -44,12 +44,18 @@ hw_timer_t *rightMotorTimer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 
 // Left/right motor timer functions
-volatile int iterations = 0;
+volatile int state = 0;
 
 void IRAM_ATTR leftTimerFunc() {
   portENTER_CRITICAL_ISR(&timerMux);
-  iterations++;
-  Serial.println(iterations);
+  if (state == 0) {
+    digitalWrite(19, HIGH);
+    state = 1;
+  }
+  else {
+    digitalWrite(19, LOW);
+    state = 0;
+  }
   portEXIT_CRITICAL_ISR(&timerMux);
 }
 
@@ -71,10 +77,10 @@ void setup() {
   IMU1.setFullScaleGyroRange(MPU6050_GYRO_FS_500);
 
   // Setup hardware timers:
-  //leftMotorTimer = timerBegin(0, 80, true);
-  //timerAttachInterrupt(leftMotorTimer, &leftTimerFunc, true);
-  //timerAlarmWrite(leftMotorTimer, 400, true);
-  //timerAlarmEnable(leftMotorTimer);
+  leftMotorTimer = timerBegin(0, 80, true);
+  timerAttachInterrupt(leftMotorTimer, &leftTimerFunc, true);
+  timerAlarmWrite(leftMotorTimer, 490, true);
+  timerAlarmEnable(leftMotorTimer);
   pinMode(19, OUTPUT);
   pinMode(33, OUTPUT);
   digitalWrite(33, HIGH);
@@ -175,15 +181,6 @@ float angleOutput = 0.0;
 const long DT_MS = 10; // f=100 hz cycle
 long tn, tlast = millis();
 void loop(){
-    Serial.println("in");
-    digitalWrite(33, 0);
-    digitalWrite(19, 1);
-    delayMicroseconds(500);
-    digitalWrite(19, 0);
-     delayMicroseconds(50);delayMicroseconds(50);
-    digitalWrite(19, 1);
-     delayMicroseconds(500);
-    digitalWrite(19, 0);
-     delayMicroseconds(500);
+    
 
 }
