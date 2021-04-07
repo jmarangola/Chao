@@ -14,4 +14,11 @@ void chaoStepper::init() {
     pinMode(dir, OUTPUT);
 }
 
+void chaoStepper::setDir() {
+    if currentDirection
+}
+
+int main(void) {
+    ;
+}
 

@@ -13,7 +13,7 @@
 #define dT_MICROSECONDS 5000
 #define dT dT_MICROSECONDS/1000000.0
 #define STABLE_STATE_DELTA_THETA 0.05
-#define EMA_ALPHA 0.80
+#define EMA_ALPHA 0.82
 
 #define STEP_LEFT_P 19
 #define DIR_LEFT_P 2
@@ -40,6 +40,7 @@ long currentTime, lastTime;
 
 // Hardware clock timers
 hw_timer_t *leftMotorTimer = NULL;
+hw_timer_t *rightMotorTimer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 
 // Left/right motor timer functions
@@ -68,12 +69,15 @@ void setup() {
   Wire.begin(21,22,400000);
   IMU1.initialize();
   IMU1.setFullScaleGyroRange(MPU6050_GYRO_FS_500);
-  // Setup hw timers:
-  leftMotorTimer = timerBegin(0, 80, true);
-  timerAttachInterrupt(leftMotorTimer, &leftTimerFunc, true);
-  timerAlarmWrite(leftMotorTimer, 400, true);
-  timerAlarmEnable(leftMotorTimer);
+
+  // Setup hardware timers:
+  //leftMotorTimer = timerBegin(0, 80, true);
+  //timerAttachInterrupt(leftMotorTimer, &leftTimerFunc, true);
+  //timerAlarmWrite(leftMotorTimer, 400, true);
+  //timerAlarmEnable(leftMotorTimer);
   pinMode(19, OUTPUT);
+  pinMode(33, OUTPUT);
+  digitalWrite(33, HIGH);
 
 }
 
@@ -168,7 +172,18 @@ float accAng = 0.0, thetaAngle = 0.0, thetOld = 0.0;
 float speed = 2.0;
 float angleOutput = 0.0;
 
+const long DT_MS = 10; // f=100 hz cycle
+long tn, tlast = millis();
 void loop(){
-  
+    Serial.println("in");
+    digitalWrite(33, 0);
+    digitalWrite(19, 1);
+    delayMicroseconds(500);
+    digitalWrite(19, 0);
+     delayMicroseconds(50);delayMicroseconds(50);
+    digitalWrite(19, 1);
+     delayMicroseconds(500);
+    digitalWrite(19, 0);
+     delayMicroseconds(500);
 
 }
