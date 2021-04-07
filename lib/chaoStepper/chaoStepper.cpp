@@ -3,31 +3,34 @@
 #include <cmath>
 
 chaoStepper::chaoStepper(uint8_t step, uint8_t dir, uint8_t tindex, void (*tfunc)()) {
-    timerNumber = tindex;
     func = tfunc;
-    this->step = step;
-    this->dir = dir;
+    index = tindex;
+    stepPin = step;
+    dirPin = dir;
     init();
 }
 
 void chaoStepper::init() {
     pinMode(step, OUTPUT);
     pinMode(dir, OUTPUT);
+    mTimer = timerBegin(index, 2, true);
+    timerAttachInterrupt(mTimer, func, true);
+    timerAlarmEnable(mTimer);
 }
 
-void IRAM_ATTR fastStepper::pulseFunction() {
+void IRAM_ATTR chaoStepper::pulseFunction() {
     if (!stepState) {
-        _step += dir; 
+        //_step += dir; 
         stepState = 1;
-        GPIO.out_w1ts = 1<<_stepPin;
+        GPIO.out_w1ts = 1<< stepPin;
     } 
     else {
         stepState = 0;
-        GPIO.out_w1tc = 1<<_stepPin;
+        GPIO.out_w1tc = 1<< stepPin;
     }
 }
 
-void fastStepper::update() {
+void chaoStepper::cycleUpdate() {
     float speed;
     int8_t lastDir = dir;
     dir = (velocity > 0) ? 0 : 1;
@@ -36,24 +39,24 @@ void fastStepper::update() {
     if (speed > maxSpeed) speed = maxSpeed; 
 
     if (dir != lastDir) // change direction if it differs from the old direction
-        digitalWrite(_dirPin, ((dir == 1) ? 1 : 0));
+        digitalWrite(dirPin, ((dir == 1) ? 1 : 0));
     
     if (velocity != lastVelocity) {
         if (speed != 0) {
-            timerSpeedInt = (uint32_t) (400000.0/absSpeed);
-            timerAlarmWrite(_timer, timerSpeedInt, true);
+            timerSpeedInt = (uint32_t) (400000.0/speed);
+            timerAlarmWrite(mTimer, timerSpeedInt, true);
             if (!timerEnabled) {
-                timerAlarmEnable(_timer); // Re-enable timer
+                timerAlarmEnable(mTimer); // Re-enable timer
                 timerEnabled = 1;
             } 
         }
         else {
-            timerAlarmWrite(_timer, 100000, true);
-            timerAlarmDisable(_timer);
+            timerAlarmWrite(mTimer, 100000, true);
+            timerAlarmDisable(mTimer);
             timerEnabled = 0;
         }
-  }
-  lastSpeed = speed;
+    }
+  lastVelocity = velocity;
 }
 
 

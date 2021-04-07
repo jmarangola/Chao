@@ -1,9 +1,12 @@
 #include <stdint.h>
 #include <Arduino.h>
 class chaoStepper {
-        __int8_t step, dir, timerNumber;
+        __int8_t stepPin, dirPin;
+        hw_timer_t  * mTimer = NULL;
+        int index;
         void (*func) ();
         void IRAM_ATTR pulseFunction();
+        void init();
         void cycleUpdate();
 
         volatile bool stepState=0;
@@ -14,9 +17,6 @@ class chaoStepper {
 
         const float maxSpeed = 3000.0; 
         float lastVelocity = 0;
-
-        void init();
-
 
     public:
         chaoStepper(uint8_t step, uint8_t dir, uint8_t tindex,void (*tfunc)());
