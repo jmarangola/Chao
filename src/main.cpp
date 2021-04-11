@@ -36,26 +36,45 @@ float gyroscopeOffsets[3], thetaOld;
 float joyInput[4] = {0, 0, 0, 0};
 long currentTime, lastTime;
 
+portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
+
+
 // PID Objects
 //PIDController angle(kp_a, ki_a, kd_a, (int16_t)(-1*MAXIMUM_SPEED_T), (int16_t) MAXIMUM_SPEED_T, DELTA_T);
 
 // Hardware clock timers
-//hw_timer_t *leftMotorTimer = NULL;
+hw_timer_t *leftMotorTimer = NULL;
 //hw_timer_t *rightMotorTimer = NULL;
+//volatile int thesholdPulses = 4000; // threshold steps around
+//volatile int maxpulses = 4000*8;
+//volatile int ceiling = thesholdPulses;
+volatile int8_t state = 0;
+//volatile int steps = 0;
+//volatile int timeCount = 16000;
+// volatile int timeReducton = 600;
 
-portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
-
-void IRAM_ATTR leftStepperTrigger() {
+void IRAM_ATTR leftTimerFunc(){
   portENTER_CRITICAL_ISR(&timerMux);
-  // call func left stepper
+  if (!state) {
+    GPIO.out_w1ts = 1<< 19;
+    state = 1;
+  }
+  else {
+    state = 0;
+    GPIO.out_w1tc = 1<< 19;
+  }
+ /* if (steps == maxpulses) {
+    timerAlarmDisable(leftMotorTimer);
+  }
+
+  else if (steps == ceiling) {
+    steps = 0;
+    ceiling += thesholdPulses;
+    timerAlarmWrite(leftMotorTimer, timeCount-timeReducton, true);
+  }*/
   portEXIT_CRITICAL_ISR(&timerMux);
 }
 
-void IRAM_ATTR rightStepperTrigger() {
-  portENTER_CRITICAL_ISR(&timerMux);
-  // call func here
-  portENTER_CRITICAL_ISR(&timerMux);
-}
 
 
 void setup() {
@@ -69,14 +88,14 @@ void setup() {
   IMU1.setFullScaleGyroRange(MPU6050_GYRO_FS_500);
 
   // Setup hardware timers:
-  //leftMotorTimer = timerBegin(0, 80, true);
-  //timerAttachInterrupt(leftMotorTimer, &leftTimerFunc, true);
-  //timerAlarmWrite(leftMotorTimer, 490, true);
-  //timerAlarmEnable(leftMotorTimer);
-  ///pinMode(19, OUTPUT);
-  //pinMode(33, OUTPUT);
-  //digitalWrite(33, HIGH);
-
+  leftMotorTimer = timerBegin(0, 2, true);
+  timerAttachInterrupt(leftMotorTimer, &leftTimerFunc, true);
+  timerAlarmWrite(leftMotorTimer, 14000, true);
+  timerAlarmEnable(leftMotorTimer);
+  pinMode(19, OUTPUT);
+  pinMode(33, OUTPUT);
+  digitalWrite(33, HIGH);
+  lastTime = millis();
 }
 
 
@@ -162,8 +181,8 @@ void slideDrive(int &left, int &right, int maxSpeed) {
   getAxisInput(5, 5, 5, 5, joyInput);
   maxSpeed *= (2/MICROSTEP_RES);
   // Distribute turning offset:
-  left = (joyInput[1] * maxSpeed) + (TURN_SENSITIVITY * (-1/2) * joyInput[2]); 
-  right = (joyInput[1] * maxSpeed) + (TURN_SENSITIVITY * (1/2) * joyInput[2]);
+  left = (joyInput[1] * maxSpeed) + (TURN_SENSITIVITY * (-1.00/2.00) * joyInput[2]); 
+  right = (joyInput[1] * maxSpeed) + (TURN_SENSITIVITY * (1.00/2.00) * joyInput[2]);
 }
 
 float accAng = 0.0, thetaAngle = 0.0, thetOld = 0.0;
@@ -171,8 +190,15 @@ float speed = 2.0;
 float angleOutput = 0.0;
 
 const long DT_MS = 10; // f=100 hz cycle
-long tn, tlast = millis();
+int time_ = 14000;
 
 void loop(){
+
+  currentTime = millis();
+  if (time_ > 10000 && (currentTime - lastTime) > 1000) {
+    time_ -= 200;
+    timerAlarmWrite(leftMotorTimer, time_, true);
+
+  }
 
 }

@@ -5,9 +5,8 @@ class chaoStepper {
         hw_timer_t  * mTimer = NULL;
         int index;
         void (*func) ();
-        void IRAM_ATTR pulseFunction();
         void init();
-        void cycleUpdate();
+
 
         volatile bool stepState=0;
         volatile int step;
@@ -20,7 +19,8 @@ class chaoStepper {
 
     public:
         chaoStepper(uint8_t step, uint8_t dir, uint8_t tindex,void (*tfunc)());
-
+        void IRAM_ATTR pulseFunction();
+        void cycleUpdate();
         float velocity = 0;
 
 

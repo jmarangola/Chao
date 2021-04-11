@@ -21,10 +21,13 @@ void chaoStepper::init() {
 void IRAM_ATTR chaoStepper::pulseFunction() {
     if (!stepState) {
         //_step += dir; 
+        Serial.println(stepState);
         stepState = 1;
         GPIO.out_w1ts = 1<< stepPin;
+        //Serial.println("here");
     } 
     else {
+        Serial.println(stepState);
         stepState = 0;
         GPIO.out_w1tc = 1<< stepPin;
     }
@@ -43,7 +46,7 @@ void chaoStepper::cycleUpdate() {
     
     if (velocity != lastVelocity) {
         if (speed != 0) {
-            timerSpeedInt = (uint32_t) (400000.0/speed);
+            timerSpeedInt = (uint32_t) (500);
             timerAlarmWrite(mTimer, timerSpeedInt, true);
             if (!timerEnabled) {
                 timerAlarmEnable(mTimer); // Re-enable timer
