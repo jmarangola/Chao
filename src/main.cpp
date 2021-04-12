@@ -108,6 +108,12 @@ void IRAM_ATTR rampLeftStepper() {
         rSteps = 0;
         rV += floor(50000.0/rampRate);
       }
+      else if (rV > rEndV) { // must ramp down
+        rAbsoluteTime = floor(50000.0/rV) + rampRate;
+        timerAlarmWrite(leftMotorTimer, rAbsoluteTime, true);
+        rSteps = 0;
+        rV -= floor(50000.0/rampRate);
+      }
       else {
         Serial.println("Ramp control error.");
       }
