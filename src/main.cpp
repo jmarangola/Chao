@@ -141,47 +141,39 @@ void IRAM_ATTR rampLeftStepper() {
 
 void IRAM_ATTR rampLeftStepper() {
   portENTER_CRITICAL_ISR(&timerMux);
-  if (rDirection == rLastDirection) {
-    if (rSteps == dS) { // Same direction
-      if (rV == rEndV) {
-        
+  if (rDirection != rLastDirection) {
+    digitalWrite(19, HIGH);
+    rSteps = dS;
+    inTransition = true;
+    rLastDirection = rDirection;
+  }
+  else if (rSteps == dS) {
+    if (inTransition) { // decelerating 
+      if (rV <= 0) { // finished decelerating
+        inTransition = false;
+        rV = 0;
       }
-      else if (rV < rEndV) { // Current speed is less than that of the desired setpoint, must ramp up a level
-        rAbsoluteTime = floor(50000.0/rV) - rampRate;
-        timerAlarmWrite(leftMotorTimer, rAbsoluteTime, true);
-        rV += floor(50000.0/rampRate);
-      }
-      else if (rV > rEndV) { // must ramp down
+      else { // Still decelerating
         rAbsoluteTime = floor(50000.0/rV) + rampRate;
         timerAlarmWrite(leftMotorTimer, rAbsoluteTime, true);
         rV -= floor(50000.0/rampRate);
       }
       rSteps = 0;
     }
-    else if (inTransition && rSteps == dS) { // decelerating 
-      if (rV <= 0) { // finished decelerating
-        inTransition = false;
-        rV = 0;
-        rSteps = 0;
+    else { // If the direction of the stepper has not been altered
+      if (rV < rEndV) { // Current frequency is less than that of the desired setpoint, must ramp up a level
+        rAbsoluteTime = floor(50000.0/rV) - rampRate;
+        timerAlarmWrite(leftMotorTimer, rAbsoluteTime, true);
+        rV += floor(50000.0/rampRate);
       }
-      else { // Still decelerating
+      else if (rV > rEndV) { // Current frequency is greater than desired setpoint --> ramp down
         rAbsoluteTime = floor(50000.0/rV) + rampRate;
         timerAlarmWrite(leftMotorTimer, rAbsoluteTime, true);
-        rSteps = 0;
-        rV -= floor(50000.0/rampRate);
+        rV -= floor(50000.0/rampRate); // Decrement the frequency
       }
+      rSteps = 0;
     }
-    else { // direction is just changed
-      rSteps = dS;
-      inTransition = true;
-      digitalWrite(33, (rDirection==1) ? (LOW) : (HIGH));
-    }
-  }
-  else { // Different direction, must ramp down then ramp up
-    digitalWrite(33, (rDirection==1) ? (LOW) : (HIGH));
-    inTransition = true;
-    rLastDirection = rDirection;
-  } 
+  } // Pulse stepper here
   if (!rState) {
     GPIO.out_w1ts = 1<< 19;
     rState = 1;
@@ -219,7 +211,8 @@ void setup() {
 
   // Setup hardware timers:
   leftMotorTimer = timerBegin(0, 2, true);
-  timerAttachInterrupt(leftMotorTimer, &leftTimerFunc, true);
+  //timerAttachInterrupt(leftMotorTimer, &leftTimerFunc, true);
+  timerAttachInterrupt(leftMotorTimer, &rampLeftStepper, true);
   timerAlarmWrite(leftMotorTimer, 14000, true);
   timerAlarmEnable(leftMotorTimer);
   pinMode(19, OUTPUT);
@@ -323,12 +316,12 @@ const long DT_MS = 10; // f=100 hz cycle
 int time_ = 15000;
 
 void loop(){
-
+  /*
   currentTime = millis();
   if (time_ > 6000 && (currentTime - lastTime) > 25) {
     time_ -= 200;
     timerAlarmWrite(leftMotorTimer, time_, true);
     lastTime = currentTime;
-  }
+  }*/
 
 }
