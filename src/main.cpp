@@ -75,7 +75,61 @@ void IRAM_ATTR leftTimerFunc(){
   portEXIT_CRITICAL_ISR(&timerMux);
 }
 
+const int rampRate = 200;
+volatile int rEndV, rLevelV, rV=0;
+volatile int rSteps = 0;
+volatile int rState = 0;
+volatile int rDirection = 1; 
+volatile int rLastDirection = rDirection;
+int rAbsoluteTime = 0.0;
 
+int dS = 20000;
+
+// 50,000 / speed  = time where speed is normalized between [0, 10] 
+// Trapezoidal motion profile
+void IRAM_ATTR rampLeftStepper() {
+  portENTER_CRITICAL_ISR(&timerMux);
+    if (!rState) {
+    GPIO.out_w1ts = 1<< 19;
+    rState = 1;
+  }
+  else {
+    rState = 0;
+    GPIO.out_w1tc = 1<< 19;
+  }
+  if (rSteps == dS) {
+    if (rDirection == rLastDirection) { // Same direction, ramp up
+      if (rV == rEndV) {
+        rSteps = 0;
+      }
+      else if (rV < rEndV) { // Current speed is less than that of the desired setpoint, must ramp up a level
+        rAbsoluteTime = floor(50000.0/rV) - rampRate;
+        timerAlarmWrite(leftMotorTimer, rAbsoluteTime, true);
+        rSteps = 0;
+        rV += floor(50000.0/rampRate);
+      }
+      else {
+        Serial.println("Ramp control error.");
+      }
+    }
+    else { // Different direction, must ramp down then ramp up
+
+    }
+  }
+  portEXIT_CRITICAL_ISR(&timerMux);
+}
+void IRAM_ATTR rightTimerFunc(){
+  portENTER_CRITICAL_ISR(&timerMux);
+  if (!state) {
+    GPIO.out_w1ts = 1<< 2;
+    state = 1;
+  }
+  else {
+    state = 0;
+    GPIO.out_w1tc = 1<< 2;
+  }
+  portEXIT_CRITICAL_ISR(&timerMux);
+}
 
 void setup() {
 
@@ -190,15 +244,15 @@ float speed = 2.0;
 float angleOutput = 0.0;
 
 const long DT_MS = 10; // f=100 hz cycle
-int time_ = 14000;
+int time_ = 15000;
 
 void loop(){
 
   currentTime = millis();
-  if (time_ > 10000 && (currentTime - lastTime) > 1000) {
+  if (time_ > 6000 && (currentTime - lastTime) > 25) {
     time_ -= 200;
     timerAlarmWrite(leftMotorTimer, time_, true);
-
+    lastTime = currentTime;
   }
 
 }
