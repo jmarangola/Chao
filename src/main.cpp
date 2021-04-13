@@ -3,12 +3,14 @@
  * 
  **/ 
 
+
 #include <Arduino.h>
 #include <MPU6050.h>
 #include <cmath>
 #include <PS4Controller.h>
 #include <PIDController.h>
 #include <chaoStepper.h>
+
 
 #define GYROSCOPE_S 65.6
 #define dT_MICROSECONDS 5000
@@ -75,72 +77,20 @@ void IRAM_ATTR leftTimerFunc(){
   portEXIT_CRITICAL_ISR(&timerMux);
 }
 
-const int rampRate = 200;
-volatile int rEndV, rV=0;
-volatile int rSteps = 0;
+const int rampRate = 80;
+volatile double rEndV, rV=0;
+volatile long rSteps = 0;
 volatile int rState = 0;
 volatile int rDirection = 1; 
 volatile int rLastDirection = rDirection;
 volatile bool inTransition = 0;
 int rAbsoluteTime = 0.0;
 
-int dS = 20000;
-
-// 50,000 / speed  = time where speed is normalized between [0, 10] 
-// Trapezoidal motion profile
-/*
-void IRAM_ATTR rampLeftStepper() {
-  portENTER_CRITICAL_ISR(&timerMux);
-  if (rSteps == dS) {
-    if (rDirection == rLastDirection) { // Same direction
-      if (rV == rEndV) {
-        
-      }
-      else if (rV < rEndV) { // Current speed is less than that of the desired setpoint, must ramp up a level
-        rAbsoluteTime = floor(50000.0/rV) - rampRate;
-        timerAlarmWrite(leftMotorTimer, rAbsoluteTime, true);
-        rV += floor(50000.0/rampRate);
-      }
-      else if (rV > rEndV) { // must ramp down
-        rAbsoluteTime = floor(50000.0/rV) + rampRate;
-        timerAlarmWrite(leftMotorTimer, rAbsoluteTime, true);
-        rV -= floor(50000.0/rampRate);
-      }
-      rSteps = 0;
-    }
-    else if (inTransition) { // Done decelerating, ready to accelerate to setpoint rEndV 
-      if (rV == 0) {
-        inTransition = false;
-        rV = 0;
-        rSteps = 0;
-      }
-      else { // Still decelerating
-        rAbsoluteTime = floor(50000.0/rV) + rampRate;
-        timerAlarmWrite(leftMotorTimer, rAbsoluteTime, true);
-        rSteps = 0;
-        rV -= floor(50000.0/rampRate);
-        rSteps++;
-      }
-    }
-  else { // Different direction, must ramp down then ramp up
-      digitalWrite(33, (rDirection==1) ? (LOW) : (HIGH));
-      inTransition = true;
-      rLastDirection = rDirection;
-    } 
-  }
-  if (!rState) {
-    GPIO.out_w1ts = 1<< 19;
-    rState = 1;
-  }
-  else {
-    rState = 0;
-    GPIO.out_w1tc = 1<< 19;
-  }
-  portEXIT_CRITICAL_ISR(&timerMux);
-}*/
+int dS = 400;
 
 void IRAM_ATTR rampLeftStepper() {
   portENTER_CRITICAL_ISR(&timerMux);
+  Serial.println(rSteps);
   if (rDirection != rLastDirection) {
     digitalWrite(19, HIGH);
     rSteps = dS;
@@ -148,32 +98,33 @@ void IRAM_ATTR rampLeftStepper() {
     rLastDirection = rDirection;
   }
   else if (rSteps == dS) {
+    Serial.println("equal");
     if (inTransition) { // decelerating 
       if (rV <= 0) { // finished decelerating
         inTransition = false;
-        rV = 0;
+        rV = 0.0;
       }
       else { // Still decelerating
         rAbsoluteTime = floor(50000.0/rV) + rampRate;
         timerAlarmWrite(leftMotorTimer, rAbsoluteTime, true);
-        rV -= floor(50000.0/rampRate);
+        rV = (50000.0/rAbsoluteTime);
       }
-      rSteps = 0;
     }
     else { // If the direction of the stepper has not been altered
       if (rV < rEndV) { // Current frequency is less than that of the desired setpoint, must ramp up a level
         rAbsoluteTime = floor(50000.0/rV) - rampRate;
         timerAlarmWrite(leftMotorTimer, rAbsoluteTime, true);
-        rV += floor(50000.0/rampRate);
+        rV = (50000.0/rAbsoluteTime);
       }
       else if (rV > rEndV) { // Current frequency is greater than desired setpoint --> ramp down
         rAbsoluteTime = floor(50000.0/rV) + rampRate;
         timerAlarmWrite(leftMotorTimer, rAbsoluteTime, true);
-        rV -= floor(50000.0/rampRate); // Decrement the frequency
+        rV = (50000.0/rAbsoluteTime);
       }
-      rSteps = 0;
     }
+    rSteps = 0;
   } // Pulse stepper here
+  Serial.println("pulsing");
   if (!rState) {
     GPIO.out_w1ts = 1<< 19;
     rState = 1;
@@ -182,26 +133,38 @@ void IRAM_ATTR rampLeftStepper() {
     rState = 0;
     GPIO.out_w1tc = 1<< 19;
   }
+  rSteps++;
   portEXIT_CRITICAL_ISR(&timerMux);
 }
 
-
+volatile long t_ = 14000;
+volatile int ticks=0;
+volatile int intervalSetpoint = 8000;
+volatile double vel = 1;
+volatile double lastvel = vel;
 void IRAM_ATTR rightTimerFunc(){
   portENTER_CRITICAL_ISR(&timerMux);
   if (!state) {
-    GPIO.out_w1ts = 1<< 2;
+    GPIO.out_w1ts = 1<< 19;
     state = 1;
   }
   else {
     state = 0;
-    GPIO.out_w1tc = 1<< 2;
+    GPIO.out_w1tc = 1<< 19;
   }
+  ticks++;
+    intervalSetpoint = (int) (50000.0/vel);
+    if (t_ > intervalSetpoint && ticks == 300) {
+      t_ -= 200;
+      ticks = 0;
+      timerAlarmWrite(leftMotorTimer, t_, true);
+    }
   portEXIT_CRITICAL_ISR(&timerMux);
 }
 
 void setup() {
 
-  //PS4.begin("01:01:01:01:01:01");
+  PS4.begin("01:01:01:01:01:01");
   Serial.begin(115200);
   Serial.println("Ready.");
   pinMode(DIR_LEFT_P, OUTPUT);
@@ -212,13 +175,14 @@ void setup() {
   // Setup hardware timers:
   leftMotorTimer = timerBegin(0, 2, true);
   //timerAttachInterrupt(leftMotorTimer, &leftTimerFunc, true);
-  timerAttachInterrupt(leftMotorTimer, &rampLeftStepper, true);
+  timerAttachInterrupt(leftMotorTimer, &rightTimerFunc, true);
   timerAlarmWrite(leftMotorTimer, 14000, true);
   timerAlarmEnable(leftMotorTimer);
   pinMode(19, OUTPUT);
   pinMode(33, OUTPUT);
   digitalWrite(33, HIGH);
   lastTime = millis();
+  rV = 0;
 }
 
 
@@ -257,7 +221,7 @@ void getAxisInput(int x0Dz, int y0Dz, int x1Dz, int y1Dz, float axisInput[]){
         if (PS4.event.analog_move.stick.lx) {
             xRaw0 = (double) PS4.data.analog.stick.lx;
             axisInput[0] = (abs(xRaw0) > x0Dz) ? xRaw0 : 0.0;
-            Serial.println(axisInput[0]);
+            //Serial.println(axisInput[0]);
         }
         if (PS4.event.analog_move.stick.ly) {
             yRaw0 = (double) PS4.data.analog.stick.lx;
@@ -315,6 +279,7 @@ float angleOutput = 0.0;
 const long DT_MS = 10; // f=100 hz cycle
 int time_ = 15000;
 
+
 void loop(){
   /*
   currentTime = millis();
@@ -323,5 +288,8 @@ void loop(){
     timerAlarmWrite(leftMotorTimer, time_, true);
     lastTime = currentTime;
   }*/
+
+  
+
 
 }
