@@ -55,6 +55,7 @@ volatile int8_t state = 0;
 //volatile int timeCount = 16000;
 // volatile int timeReducton = 600;
 
+/*
 void IRAM_ATTR leftTimerFunc(){
   portENTER_CRITICAL_ISR(&timerMux);
   if (!state) {
@@ -65,7 +66,7 @@ void IRAM_ATTR leftTimerFunc(){
     state = 0;
     GPIO.out_w1tc = 1<< 19;
   }
- /* if (steps == maxpulses) {
+  if (steps == maxpulses) {
     timerAlarmDisable(leftMotorTimer);
   }
 
@@ -73,9 +74,10 @@ void IRAM_ATTR leftTimerFunc(){
     steps = 0;
     ceiling += thesholdPulses;
     timerAlarmWrite(leftMotorTimer, timeCount-timeReducton, true);
-  }*/
+  }
   portEXIT_CRITICAL_ISR(&timerMux);
-}
+} 
+*/
 
 const int rampRate = 80;
 volatile double rEndV, rV=0;
@@ -137,12 +139,17 @@ void IRAM_ATTR rampLeftStepper() {
   portEXIT_CRITICAL_ISR(&timerMux);
 }
 
+volatile int lastDirection;
+volatile int direction = 1;
+volatile int previousVel;
 volatile long t_ = 14000;
 volatile int ticks=0;
 volatile int intervalSetpoint = 8000;
 volatile double vel = 1;
+volatile int disabled = 0;
 volatile double lastvel = vel;
-void IRAM_ATTR rightTimerFunc(){
+
+void IRAM_ATTR leftTimerFunc() {
   portENTER_CRITICAL_ISR(&timerMux);
   if (!state) {
     GPIO.out_w1ts = 1<< 19;
@@ -152,14 +159,29 @@ void IRAM_ATTR rightTimerFunc(){
     state = 0;
     GPIO.out_w1tc = 1<< 19;
   }
-  ticks++;
-    intervalSetpoint = (int) (50000.0/vel);
-    if (t_ > intervalSetpoint && ticks == 300) {
-      t_ -= 200;
-      ticks = 0;
-      timerAlarmWrite(leftMotorTimer, t_, true);
+}
+
+/**
+ * Update function mutates timer parameters in loop()
+ **/ 
+void updateLeft(double vel) {
+  if (lastDirection != direction) {
+    digitalWrite(33, direction==0 ? 0 : 1);
+    lastDirection = direction;
+  }
+  if (previousVel != vel) {
+    if (abs(vel) > 0) {
+      int alarmInterval = (int) (50000.0/vel);
+      timerAlarmWrite(leftMotorTimer, alarmInterval, true);
     }
-  portEXIT_CRITICAL_ISR(&timerMux);
+    if (disabled) {
+      disabled = 0; timerAlarmEnable(leftMotorTimer);
+    }
+    else if (vel == 0) {
+      disabled = 1; timerAlarmDisable(leftMotorTimer);       
+    }
+  }
+  previousVel = vel;
 }
 
 void setup() {
@@ -175,7 +197,7 @@ void setup() {
   // Setup hardware timers:
   leftMotorTimer = timerBegin(0, 2, true);
   //timerAttachInterrupt(leftMotorTimer, &leftTimerFunc, true);
-  timerAttachInterrupt(leftMotorTimer, &rightTimerFunc, true);
+  timerAttachInterrupt(leftMotorTimer, &leftTimerFunc, true);
   timerAlarmWrite(leftMotorTimer, 14000, true);
   timerAlarmEnable(leftMotorTimer);
   pinMode(19, OUTPUT);
@@ -281,15 +303,6 @@ int time_ = 15000;
 
 
 void loop(){
-  /*
-  currentTime = millis();
-  if (time_ > 6000 && (currentTime - lastTime) > 25) {
-    time_ -= 200;
-    timerAlarmWrite(leftMotorTimer, time_, true);
-    lastTime = currentTime;
-  }*/
-
-  
-
-
+  updateLeft(6);
+  delay(10);
 }
