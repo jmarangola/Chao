@@ -9,7 +9,6 @@
 #include <cmath>
 #include <PS4Controller.h>
 #include <PIDController.h>
-#include <chaoStepper.h>
 
 
 #define GYROSCOPE_S 65.6
@@ -18,14 +17,18 @@
 #define STABLE_STATE_DELTA_THETA 0.05
 #define EMA_ALPHA 0.82
 
-#define STEP_LEFT_P 19
-#define DIR_LEFT_P 2
-#define STEP_RIGHT_P 0
-#define DIR RIGHT_P 18
-#define MICROSTEP_RES 8
+#define STEP_L 19
+#define DIR_L 33
+
+#define MICROSTEP_RES 1
 #define DELTA_T 10000
 
 #define TURN_SENSITIVITY 1.0
+
+// Speed control
+#define ALARM_MIN_DELTA 22000
+#define ALARM_MAX_DELTA 35000
+#define SPEED_DIV 44000.00
 
 // PID constants:
 #define kp_a 1.0
@@ -55,31 +58,8 @@ volatile int8_t state = 0;
 //volatile int timeCount = 16000;
 // volatile int timeReducton = 600;
 
-/*
-void IRAM_ATTR leftTimerFunc(){
-  portENTER_CRITICAL_ISR(&timerMux);
-  if (!state) {
-    GPIO.out_w1ts = 1<< 19;
-    state = 1;
-  }
-  else {
-    state = 0;
-    GPIO.out_w1tc = 1<< 19;
-  }
-  if (steps == maxpulses) {
-    timerAlarmDisable(leftMotorTimer);
-  }
 
-  else if (steps == ceiling) {
-    steps = 0;
-    ceiling += thesholdPulses;
-    timerAlarmWrite(leftMotorTimer, timeCount-timeReducton, true);
-  }
-  portEXIT_CRITICAL_ISR(&timerMux);
-} 
-*/
-
-const int rampRate = 80;
+/*const int rampRate = 80;
 volatile double rEndV, rV=0;
 volatile long rSteps = 0;
 volatile int rState = 0;
@@ -137,17 +117,16 @@ void IRAM_ATTR rampLeftStepper() {
   }
   rSteps++;
   portEXIT_CRITICAL_ISR(&timerMux);
-}
+}*/
 
 volatile int lastDirection;
 volatile int direction = 1;
 volatile int previousVel;
-volatile long t_ = 14000;
+volatile long t_ = 12000;
 volatile int ticks=0;
-volatile int intervalSetpoint = 8000;
-volatile double vel = 1;
+volatile int intervalSetpoint = 5000;
 volatile int disabled = 0;
-volatile double lastvel = vel;
+
 
 void IRAM_ATTR leftTimerFunc() {
   portENTER_CRITICAL_ISR(&timerMux);
@@ -159,37 +138,47 @@ void IRAM_ATTR leftTimerFunc() {
     state = 0;
     GPIO.out_w1tc = 1<< 19;
   }
+  portEXIT_CRITICAL_ISR(&timerMux);
+}
+
+double getTimerValue(double velocity) {
+  int timerValue = (int) (SPEED_DIV/velocity);
+  if (timerValue < ALARM_MIN_DELTA) 
+    return ALARM_MIN_DELTA;
+  else if (timerValue > ALARM_MAX_DELTA)
+    return ALARM_MAX_DELTA;
+  return timerValue;
 }
 
 /**
  * Update function mutates timer parameters in loop()
+ * Velocity is a values between (0, 2)
  **/ 
-void updateLeft(double vel) {
+void updateLeft(double velocity) {
+  direction = (velocity > 0) ? 1 : -1;
+  velocity = abs(velocity);
   if (lastDirection != direction) {
-    digitalWrite(33, direction==0 ? 0 : 1);
+    digitalWrite(33, direction == 0 ? 0 : 1);
     lastDirection = direction;
   }
-  if (previousVel != vel) {
-    if (abs(vel) > 0) {
-      int alarmInterval = (int) (50000.0/vel);
-      timerAlarmWrite(leftMotorTimer, alarmInterval, true);
-    }
+  if (previousVel != velocity) {
     if (disabled) {
       disabled = 0; timerAlarmEnable(leftMotorTimer);
     }
-    else if (vel == 0) {
-      disabled = 1; timerAlarmDisable(leftMotorTimer);       
-    }
+    else if (abs(velocity) > 0) 
+        timerAlarmWrite(leftMotorTimer, getTimerValue(abs(velocity)), true);
+    else if (velocity == 0) 
+      disabled = 1; timerAlarmDisable(leftMotorTimer);   
+    previousVel = velocity;    
   }
-  previousVel = vel;
 }
 
 void setup() {
 
-  PS4.begin("01:01:01:01:01:01");
+  //PS4.begin("01:01:01:01:01:01");
   Serial.begin(115200);
   Serial.println("Ready.");
-  pinMode(DIR_LEFT_P, OUTPUT);
+  pinMode(DIR_L, OUTPUT);
   Wire.begin(21,22,400000);
   IMU1.initialize();
   IMU1.setFullScaleGyroRange(MPU6050_GYRO_FS_500);
@@ -198,13 +187,15 @@ void setup() {
   leftMotorTimer = timerBegin(0, 2, true);
   //timerAttachInterrupt(leftMotorTimer, &leftTimerFunc, true);
   timerAttachInterrupt(leftMotorTimer, &leftTimerFunc, true);
-  timerAlarmWrite(leftMotorTimer, 14000, true);
+  timerAlarmWrite(leftMotorTimer, 22000, true);
   timerAlarmEnable(leftMotorTimer);
   pinMode(19, OUTPUT);
   pinMode(33, OUTPUT);
   digitalWrite(33, HIGH);
   lastTime = millis();
-  rV = 0;
+ 
+  pinMode(5, OUTPUT);
+  digitalWrite(5, HIGH);
 }
 
 
@@ -235,6 +226,15 @@ void emaLowPass(float &accAngle, float &thetaPrimeFiltered, float thetaOld){
   accAngle = atan2f((float) aY, (float) aZ) * 180.0/(2.0*acos(0.0)) - 2;
   thetaPrimeFiltered = ((float)((gyrX - gyroscopeOffsets[0])) / GYROSCOPE_S) * dT;
   thetaPrimeFiltered = ((EMA_ALPHA * thetaOld) +  thetaPrimeFiltered * (1 - EMA_ALPHA));
+}
+
+// HPF Coef:
+#define c 0.98
+
+double complimentaryAngleFilter(float *accelerometer, float *pitch, float *roll) {
+  //
+  // angle = c*(angle + gyroYrate*dT) + (1-c) * accXAngle;
+
 }
 
 void getAxisInput(int x0Dz, int y0Dz, int x1Dz, int y1Dz, float axisInput[]){
@@ -273,7 +273,7 @@ void getAxisInput(int x0Dz, int y0Dz, int x1Dz, int y1Dz, float axisInput[]){
 
 
 /**
- * Tank drive implementation, modifie integers corresonding to wheel speeds for each wheel
+ * Tank implementation, modifie integers corresonding to wheel speeds for each wheel
  * Max speed for 1/2 microstepping resolution
  **/ 
 void tankDrive(int &leftSpeed, int &rightSpeed, int maxSpeed) {
@@ -303,6 +303,5 @@ int time_ = 15000;
 
 
 void loop(){
-  updateLeft(6);
-  delay(10);
+
 }
