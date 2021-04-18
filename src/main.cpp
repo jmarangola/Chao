@@ -3,6 +3,7 @@
  * 
  **/ 
 
+#define _USE_MATH_DEFINES
 
 #include <Arduino.h>
 #include <MPU6050.h>
@@ -12,9 +13,9 @@
 
 
 #define GYROSCOPE_S 65.6
-#define DT_MILLIS 20
+#define DT_MILLIS 100
 // 50 hertz
-#define dT 0.02 
+#define dT (DT_MILLIS/1000.0)
 #define EMA_ALPHA 0.82
 
 #define STEP_L 19
@@ -29,13 +30,13 @@
 #define SPEED_DIV 44000.00
 
 // PID constants:
-#define kp_a 1.0
-#define kd_a 1.0
-#define ki_a 1.0
+#define kp_a 0.06
+#define kd_a 0.0
+#define ki_a 0.00025
 
 // IMU related:
 MPU6050 IMU1;
-float gyroscopeOffsets[3], thetaOld;
+float gyroscopeOffsets[3], accelerometerData[3], thetaOld;
 float joyInput[4] = {0, 0, 0, 0};
 long currentTime, lastTime;
 
@@ -117,6 +118,7 @@ void IRAM_ATTR rampLeftStepper() {
   portEXIT_CRITICAL_ISR(&timerMux);
 }*/
 
+double gyroXRate;
 volatile int lastDirection;
 volatile int direction = 1;
 volatile int previousVel;
@@ -129,12 +131,14 @@ volatile int disabled = 0;
 void IRAM_ATTR leftTimerFunc() {
   portENTER_CRITICAL_ISR(&timerMux);
   if (!state) {
-    GPIO.out_w1ts = 1<< 19;
+    GPIO.out_w1ts = 1 << 19;
+    GPIO.out_w1ts = 1 << 2;
     state = 1;
   }
   else {
     state = 0;
-    GPIO.out_w1tc = 1<< 19;
+    GPIO.out_w1tc = 1 << 19;
+    GPIO.out_w1tc = 1 << 2;
   }
   portEXIT_CRITICAL_ISR(&timerMux);
 }
@@ -154,23 +158,28 @@ double getTimerValue(double velocity) {
  **/ 
 void updateLeft(double velocity) {
   direction = (velocity > 0) ? 1 : -1;
-  Serial.println(direction);
+  //Serial.println(direction);
   velocity = abs(velocity);
   if (lastDirection != direction) {
     digitalWrite(33, direction == -1 ? LOW : HIGH);
+    digitalWrite(2, direction == -1 ? LOW : HIGH);
     lastDirection = direction;
   }
   if (previousVel != velocity) {
-    /*if (disabled) {
-      disabled = 0; timerAlarmEnable(leftMotorTimer);
-    }*/
+  /*if (disabled) {
+      disabled = 0; timerAlarmEnable(leftMotorTimer); 
+  }*/
   if (abs(velocity) > 0) 
         timerAlarmWrite(leftMotorTimer, getTimerValue(abs(velocity)), true);
-    /*else if (velocity == 0) 
+
+  /*else if (velocity == 0) 
       disabled = 1; timerAlarmDisable(leftMotorTimer);   
-    previousVel = velocity;  */  
+      timerAlarmWrite(leftMotorTimer, 100000, true);  }*/
+    previousVel = velocity;  
   }
 }
+
+
 
 void setup() {
 
@@ -192,19 +201,18 @@ void setup() {
   pinMode(33, OUTPUT);
   lastTime = millis();
  
-  pinMode(5, OUTPUT);
-  digitalWrite(5, HIGH);
+  pinMode(2, OUTPUT);
+
   lastDirection = 1;
   previousVel = 2.0;
 }
 
 
-//float dT = 0.005;
 float deltaGyroAngle, accAngle;
 float gXSum = 0.0;
 int16_t gyrX, gyrY, gyrZ, aX, aY, aZ, oX, oY, oZ;
 
-void computeGyroOffsets(int8_t N = 100) {
+void computeGyroOffsets(int8_t N = 10) {
   for (int i = 0; i <= 100; i++){
     IMU1.getRotation(&oX, &oY, &oZ);
     gyroscopeOffsets[0] += oX;
@@ -229,14 +237,14 @@ void emaLowPass(float *accAngle, float &thetaPrimeFiltered, float thetaOld){
   thetaPrimeFiltered = ((EMA_ALPHA * thetaOld) +  thetaPrimeFiltered * (1 - EMA_ALPHA));
 }
 
-// HPF Coef:
-#define c 0.98
 
-double complimentaryAngleFilter(float *accelerometer, float *pitch, float *roll) {
-  //
-  // angle = c*(angle + gyroYrate*dT) + (1-c) * accXAngle;
-
-}
+void ComplementaryFilter(double *nextAngle)
+{
+  IMU1.getMotion6(&gyrX, &gyrY, &gyrZ, &aX, &aY, &aZ);
+  computeGyroOffsets();
+  accAngle = atan2f((float) aY, (float) aZ) * 180.0/(2.0*acos(0.0)) - 2;
+  *nextAngle = 0.98 * (*nextAngle + gyroscopeOffsets[0]*dT) + 0.02 * (accAngle);
+} 
 
 void getAxisInput(int x0Dz, int y0Dz, int x1Dz, int y1Dz, float axisInput[]){
   double xRaw0, yRaw0, xRaw1, yRaw1;
@@ -290,6 +298,7 @@ void tankDrive(int &leftSpeed, int &rightSpeed, int maxSpeed) {
 void slideDrive(int &left, int &right, int maxSpeed) {
   getAxisInput(5, 5, 5, 5, joyInput);
   maxSpeed *= (2/MICROSTEP_RES);
+
   // Distribute turning offset:
   left = (joyInput[1] * maxSpeed) + (TURN_SENSITIVITY * (-1.00/2.00) * joyInput[2]); 
   right = (joyInput[1] * maxSpeed) + (TURN_SENSITIVITY * (1.00/2.00) * joyInput[2]);
@@ -302,14 +311,28 @@ float angleOutput = 0.0;
 const long DT_MS = 10; // f=100 hz cycle
 int time_ = 15000;
 
+double thet = 0.0;
+
+double integral, proportional, derivative, error, lastError=0.0, setpoint = 0.0, output;
+
+
 
 void loop(){
   currentTime = millis();
-  if (currentTime - lastTime > 100) {
-    emaLowPass(gyroscopeOffsets, thetaAngle, thetaOld);
-    thetaOld = thetaAngle;
-    Serial.println(thetaAngle);
-    updateLeft(3.0);
-   // digitalWrite(33, LOW);
+  if (currentTime - lastTime > dT) {
+    ComplementaryFilter(&thet);
+    thetOld = thetaAngle;
+    error = setpoint - thetaAngle;
+    proportional = kp_a * error;
+    integral += ki_a * error * dT;
+    if (integral > 2) integral = 2;
+    if (integral < -2) integral = -2;
+    derivative = kd_a*(error - lastError) / (dT);
+    lastError = error;
+    output = proportional + integral + derivative;
+    updateLeft(output);
+    //Serial.println(-output);
+    Serial.println(thet);
   }
+
 }
