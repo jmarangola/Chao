@@ -10,10 +10,13 @@
 #include <cmath>
 #include <PS4Controller.h>
 #include <PIDController.h>
+#include <FastAccelStepper.h>
 
+FastAccelStepperEngine engine = FastAccelStepperEngine();
+FastAccelStepper *leftStepper = NULL;
 
 #define GYROSCOPE_S 65.6
-#define DT_MILLIS 100
+#define DT_MILLIS 10
 // 50 hertz
 #define dT (DT_MILLIS/1000.0)
 #define EMA_ALPHA 0.82
@@ -30,9 +33,9 @@
 #define SPEED_DIV 44000.00
 
 // PID constants:
-#define kp_a 0.06
+#define kp_a 0.1
 #define kd_a 0.0
-#define ki_a 0.00025
+#define ki_a 0.0000
 
 // IMU related:
 MPU6050 IMU1;
@@ -47,7 +50,7 @@ portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 PIDController anglePID(kp_a, ki_a, kd_a, -2.0, 2.0, (DT_MILLIS/1000.0));
 
 // Hardware clock timers
-hw_timer_t *leftMotorTimer = NULL;
+//hw_timer_t *leftMotorTimer = NULL;
 //hw_timer_t *rightMotorTimer = NULL;
 //volatile int thesholdPulses = 4000; // threshold steps around
 //volatile int maxpulses = 4000*8;
@@ -156,28 +159,33 @@ double getTimerValue(double velocity) {
  * Update function mutates timer parameters in loop()
  * Velocity is a values between (0, 2)
  **/ 
+/*
 void updateLeft(double velocity) {
   direction = (velocity > 0) ? 1 : -1;
   //Serial.println(direction);
   velocity = abs(velocity);
   if (lastDirection != direction) {
     digitalWrite(33, direction == -1 ? LOW : HIGH);
-    digitalWrite(2, direction == -1 ? LOW : HIGH);
+    digitalWrite(15, direction == -1 ? LOW : HIGH);
     lastDirection = direction;
   }
   if (previousVel != velocity) {
-  /*if (disabled) {
-      disabled = 0; timerAlarmEnable(leftMotorTimer); 
-  }*/
-  if (abs(velocity) > 0) 
-        timerAlarmWrite(leftMotorTimer, getTimerValue(abs(velocity)), true);
+    if (disabled) {
+      disabled = 0; 
+      timerAlarmEnable(leftMotorTimer); 
+    }
+    if (abs(velocity) > 0) 
+          timerAlarmWrite(leftMotorTimer, getTimerValue(abs(velocity)), true);
+    else {
+        timerAlarmWrite(leftMotorTimer, 100000, true);
+        timerAlarmDisable(leftMotorTimer);
+        disabled = 1;
 
-  /*else if (velocity == 0) 
-      disabled = 1; timerAlarmDisable(leftMotorTimer);   
-      timerAlarmWrite(leftMotorTimer, 100000, true);  }*/
-    previousVel = velocity;  
+    }
+    
   }
-}
+  previousVel = velocity;  
+}*/
 
 
 
@@ -192,16 +200,27 @@ void setup() {
   IMU1.setFullScaleGyroRange(MPU6050_GYRO_FS_500);
 
   // Setup hardware timers:
-  leftMotorTimer = timerBegin(0, 2, true);
+  //leftMotorTimer = timerBegin(0, 2, true);
   //timerAttachInterrupt(leftMotorTimer, &leftTimerFunc, true);
-  timerAttachInterrupt(leftMotorTimer, &leftTimerFunc, true);
-  timerAlarmWrite(leftMotorTimer, 22000, true);
-  timerAlarmEnable(leftMotorTimer);
+  //timerAttachInterrupt(leftMotorTimer, &leftTimerFunc, true);
+  //timerAlarmWrite(leftMotorTimer, 22000, true);
+  //timerAlarmEnable(leftMotorTimer);
+  
   pinMode(19, OUTPUT);
   pinMode(33, OUTPUT);
   lastTime = millis();
  
   pinMode(2, OUTPUT);
+  pinMode(15, OUTPUT);
+  digitalWrite(15, HIGH);
+  digitalWrite(33, HIGH);
+  engine.init();
+  leftStepper = engine.stepperConnectToPin(2);
+  leftStepper->setDirectionPin(15);
+  leftStepper->setAutoEnable(true);
+
+  leftStepper->setSpeed(700);  // the parameter is us/step !!!
+  leftStepper->setAcceleration(10000);
 
   lastDirection = 1;
   previousVel = 2.0;
@@ -218,9 +237,8 @@ void computeGyroOffsets(int8_t N = 10) {
     gyroscopeOffsets[0] += oX;
     gyroscopeOffsets[1] += oY;
     gyroscopeOffsets[2] += oZ;
-    delay(5);
   }
-  gyroscopeOffsets[0] /= N;
+  gyroscopeOffsets[0] /= (N);
   gyroscopeOffsets[1] /= N;
   gyroscopeOffsets[2] /= N;
 }
@@ -237,14 +255,6 @@ void emaLowPass(float *accAngle, float &thetaPrimeFiltered, float thetaOld){
   thetaPrimeFiltered = ((EMA_ALPHA * thetaOld) +  thetaPrimeFiltered * (1 - EMA_ALPHA));
 }
 
-
-void ComplementaryFilter(double *nextAngle)
-{
-  IMU1.getMotion6(&gyrX, &gyrY, &gyrZ, &aX, &aY, &aZ);
-  computeGyroOffsets();
-  accAngle = atan2f((float) aY, (float) aZ) * 180.0/(2.0*acos(0.0)) - 2;
-  *nextAngle = 0.98 * (*nextAngle + gyroscopeOffsets[0]*dT) + 0.02 * (accAngle);
-} 
 
 void getAxisInput(int x0Dz, int y0Dz, int x1Dz, int y1Dz, float axisInput[]){
   double xRaw0, yRaw0, xRaw1, yRaw1;
@@ -308,31 +318,35 @@ float accAng = 0.0, thetaAngle = 0.0, thetOld = 0.0;
 float speed = 2.0;
 float angleOutput = 0.0;
 
-const long DT_MS = 10; // f=100 hz cycle
-int time_ = 15000;
-
 double thet = 0.0;
 
 double integral, proportional, derivative, error, lastError=0.0, setpoint = 0.0, output;
 
 
+float pitch = 0.0, roll = 0.0, pitchAcc = 0.0, rollAcc = 0.0;
+int mag = 0;
 
 void loop(){
   currentTime = millis();
-  if (currentTime - lastTime > dT) {
-    ComplementaryFilter(&thet);
-    thetOld = thetaAngle;
-    error = setpoint - thetaAngle;
-    proportional = kp_a * error;
-    integral += ki_a * error * dT;
-    if (integral > 2) integral = 2;
-    if (integral < -2) integral = -2;
-    derivative = kd_a*(error - lastError) / (dT);
-    lastError = error;
-    output = proportional + integral + derivative;
-    updateLeft(output);
-    //Serial.println(-output);
-    Serial.println(thet);
+  if (currentTime - lastTime > DT_MILLIS) {
+      IMU1.getMotion6(&aX, &aY, &aZ, &gyrX, &gyrY, &gyrZ);
+
+      pitch += (float) (gyrX/GYROSCOPE_S) * dT;
+      roll += (float) (gyrY/GYROSCOPE_S) * dT;
+
+      mag = abs(aX) + abs(aY) + abs(aZ);
+      if (mag > 8192 && mag < 32768) {
+      pitchAcc = atan2f((float)aY, (float)aZ) * 180 / M_PI;
+      pitch = pitch * 0.96 + pitchAcc * 0.04;
+
+      // Turning around the Y axis results in a vector on the X-axis
+      rollAcc = atan2f((float)aX, (float)aZ) * 180 / M_PI;
+      roll = roll * 0.98 + rollAcc * 0.02;
+      Serial.println(pitch);
+    }
+    lastTime = currentTime;
   }
+
+  
 
 }
