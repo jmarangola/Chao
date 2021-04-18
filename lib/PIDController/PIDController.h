@@ -2,7 +2,7 @@
 #include <stdint.h>
 class PIDController {
     public:
-        PIDController(float kp, float ki, float kd, int16_t minOutput, int16_t maxOutput, float dt);
+        PIDController(float kp, float ki, float kd, double minOutput, double maxOutput, float dt);
 
         void resetAll();
         void setParameters(float kp, float ki, float kd);
@@ -11,7 +11,7 @@ class PIDController {
         void init();
         float compute();
 
-        float outputMax, outputMin;
+        double outputMax, outputMin;
         float setpoint, input;
 
     private:

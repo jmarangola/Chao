@@ -12,16 +12,14 @@
 
 
 #define GYROSCOPE_S 65.6
-#define dT_MICROSECONDS 5000
-#define dT dT_MICROSECONDS/1000000.0
-#define STABLE_STATE_DELTA_THETA 0.05
+#define DT_MILLIS 20
+// 50 hertz
+#define dT 0.02 
 #define EMA_ALPHA 0.82
 
 #define STEP_L 19
 #define DIR_L 33
-
 #define MICROSTEP_RES 1
-#define DELTA_T 10000
 
 #define TURN_SENSITIVITY 1.0
 
@@ -45,7 +43,7 @@ portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 
 
 // PID Objects
-//PIDController angle(kp_a, ki_a, kd_a, (int16_t)(-1*MAXIMUM_SPEED_T), (int16_t) MAXIMUM_SPEED_T, DELTA_T);
+PIDController anglePID(kp_a, ki_a, kd_a, -2.0, 2.0, (DT_MILLIS/1000.0));
 
 // Hardware clock timers
 hw_timer_t *leftMotorTimer = NULL;
@@ -156,20 +154,21 @@ double getTimerValue(double velocity) {
  **/ 
 void updateLeft(double velocity) {
   direction = (velocity > 0) ? 1 : -1;
+  Serial.println(direction);
   velocity = abs(velocity);
   if (lastDirection != direction) {
-    digitalWrite(33, direction == 0 ? 0 : 1);
+    digitalWrite(33, direction == -1 ? LOW : HIGH);
     lastDirection = direction;
   }
   if (previousVel != velocity) {
-    if (disabled) {
+    /*if (disabled) {
       disabled = 0; timerAlarmEnable(leftMotorTimer);
-    }
-    else if (abs(velocity) > 0) 
+    }*/
+  if (abs(velocity) > 0) 
         timerAlarmWrite(leftMotorTimer, getTimerValue(abs(velocity)), true);
-    else if (velocity == 0) 
+    /*else if (velocity == 0) 
       disabled = 1; timerAlarmDisable(leftMotorTimer);   
-    previousVel = velocity;    
+    previousVel = velocity;  */  
   }
 }
 
@@ -191,11 +190,12 @@ void setup() {
   timerAlarmEnable(leftMotorTimer);
   pinMode(19, OUTPUT);
   pinMode(33, OUTPUT);
-  digitalWrite(33, HIGH);
   lastTime = millis();
  
   pinMode(5, OUTPUT);
   digitalWrite(5, HIGH);
+  lastDirection = 1;
+  previousVel = 2.0;
 }
 
 
@@ -221,10 +221,11 @@ void computeGyroOffsets(int8_t N = 100) {
  * EMA Moving Average Low Pass filter implementation, thetaOld is last value, thetaPrimeFiltered is the 
  *  resulting value, dT is the differential time unit
  **/
-void emaLowPass(float &accAngle, float &thetaPrimeFiltered, float thetaOld){
+void emaLowPass(float *accAngle, float &thetaPrimeFiltered, float thetaOld){
   IMU1.getMotion6(&gyrX, &gyrY, &gyrZ, &aX, &aY, &aZ);
-  accAngle = atan2f((float) aY, (float) aZ) * 180.0/(2.0*acos(0.0)) - 2;
-  thetaPrimeFiltered = ((float)((gyrX - gyroscopeOffsets[0])) / GYROSCOPE_S) * dT;
+  *accAngle = atan2f((float) aY, (float) aZ) * 180.0/(2.0*acos(0.0)) - 2;
+  //thetaPrimeFiltered = ((float)((gyrY - gyroscopeOffsets[1])) / GYROSCOPE_S) * dT;
+  thetaPrimeFiltered = ((float)((gyrY)) / GYROSCOPE_S) * dT;
   thetaPrimeFiltered = ((EMA_ALPHA * thetaOld) +  thetaPrimeFiltered * (1 - EMA_ALPHA));
 }
 
@@ -303,5 +304,12 @@ int time_ = 15000;
 
 
 void loop(){
-
+  currentTime = millis();
+  if (currentTime - lastTime > 100) {
+    emaLowPass(gyroscopeOffsets, thetaAngle, thetaOld);
+    thetaOld = thetaAngle;
+    Serial.println(thetaAngle);
+    updateLeft(3.0);
+   // digitalWrite(33, LOW);
+  }
 }

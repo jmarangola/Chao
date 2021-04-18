@@ -15,7 +15,7 @@
 #include <stdint.h>
 using namespace std;
 
-PIDController::PIDController(float kp, float ki, float kd, int16_t minOutput, int16_t maxOutput, float dt) {
+PIDController::PIDController(float kp, float ki, float kd, double minOutput, double maxOutput, float dt) {
     this->dt = dt;
     this->kp = kp;
     this->ki = ki*dt;
@@ -39,7 +39,6 @@ float PIDController::compute() {
     float outputResult;
     error = setpoint - input;
     proportional = kp*error;
-
     integral += ki*error;
     if (integral > outputMax) 
         integral = outputMax;
