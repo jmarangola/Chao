@@ -14,9 +14,10 @@
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *leftStepper = NULL;
+FastAccelStepper *rightStepper = NULL;
 
 #define GYROSCOPE_S 65.6
-#define DT_MILLIS 10
+#define DT_MILLIS 20
 // 50 hertz
 #define dT (DT_MILLIS/1000.0)
 #define EMA_ALPHA 0.82
@@ -218,12 +219,16 @@ void setup() {
   digitalWrite(33, HIGH);
   engine.init();
   leftStepper = engine.stepperConnectToPin(2);
+  rightStepper = engine.stepperConnectToPin(19);
   leftStepper->setDirectionPin(15);
+  rightStepper->setDirectionPin(33);
   leftStepper->setAutoEnable(true);
 
   leftStepper->setSpeed(700);  // the parameter is us/step !!!
-  leftStepper->setAcceleration(10000);
+  rightStepper->setSpeed(700);
 
+  leftStepper->setAcceleration(10000);
+  rightStepper->setAcceleration(10000);
   lastDirection = 1;
   previousVel = 2.0;
 }
@@ -335,19 +340,20 @@ float angleOutput = 0.0;
 double thet = 0.0;
 
 double integral, proportional, derivative, error, lastError=0.0, setpoint = 0.0, output;
-double maxOutput = 700;
-double minOutput = -700;
 
-double kp = 1.0;
-double ki = 0.5;
+double maxOutput = 10;
+double minOutput = -10;
+
+double kp = 1.2;
+double ki = 0.0;
 double kd = 0.0;
 
 void loop(){
   currentTime = millis();
   if (currentTime - lastTime > DT_MILLIS) {
       complementaryFilter(&pitch, &roll);
-      error = (0.0 - pitch);
-      proportional = error * kp;
+      error = pitch;
+      proportional = (0.0 - error) * kp;
       integral += ki * error * dT;
       if (integral > maxOutput) 
         integral = maxOutput;
@@ -356,21 +362,26 @@ void loop(){
       derivative = kd * (error - lastError)/dT;
       if (output > maxOutput) 
         output = maxOutput;
-      else if (output < minOutput) 
+      if (output < minOutput) 
         output = minOutput;
       output = proportional + integral + derivative;
-      leftStepper->setSpeed(output);
+      Serial.println(output);
+     leftStepper->setSpeed((int) (60000/abs(output)));
+      rightStepper->setSpeed((int)(60000/abs(output)));
       if (output > 0) {
         leftStepper->runForward();
+        rightStepper->runForward();
       }
       else if (output < 0) {
         leftStepper->runBackward();
+        rightStepper->runBackward();
       }
       else {
-        leftStepper->move(0);
+        
       }
-      
-      
+      lastError = error;
+
+      lastTime = currentTime;
   }
 
   
