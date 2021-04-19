@@ -39,6 +39,8 @@ FastAccelStepper *leftStepper = NULL;
 
 // IMU related:
 MPU6050 IMU1;
+float pitch = 0.0, roll = 0.0, pitchAcc = 0.0, rollAcc = 0.0;
+int mag = 0;
 float gyroscopeOffsets[3], accelerometerData[3], thetaOld;
 float joyInput[4] = {0, 0, 0, 0};
 long currentTime, lastTime;
@@ -290,7 +292,19 @@ void getAxisInput(int x0Dz, int y0Dz, int x1Dz, int y1Dz, float axisInput[]){
     }
 }
 
-
+void complementaryFilter(float *pitch, float *roll) {
+      IMU1.getMotion6(&aX, &aY, &aZ, &gyrX, &gyrY, &gyrZ);
+      *pitch += (float) (gyrX/GYROSCOPE_S) * dT;
+      *roll += (float) (gyrY/GYROSCOPE_S) * dT;
+      mag = abs(aX) + abs(aY) + abs(aZ);
+      if (mag > 8192 && mag < 32768) {
+        pitchAcc = atan2f((float)aY, (float)aZ) * 180 / M_PI;
+        *pitch = *pitch * 0.96 + pitchAcc * 0.04;
+        rollAcc = atan2f((float)aX, (float)aZ) * 180 / M_PI;
+        *roll = *roll * 0.96 + rollAcc * 0.04;
+        //Serial.println(*pitch);
+    }
+}
 /**
  * Tank implementation, modifie integers corresonding to wheel speeds for each wheel
  * Max speed for 1/2 microstepping resolution
@@ -321,30 +335,42 @@ float angleOutput = 0.0;
 double thet = 0.0;
 
 double integral, proportional, derivative, error, lastError=0.0, setpoint = 0.0, output;
+double maxOutput = 700;
+double minOutput = -700;
 
-
-float pitch = 0.0, roll = 0.0, pitchAcc = 0.0, rollAcc = 0.0;
-int mag = 0;
+double kp = 1.0;
+double ki = 0.5;
+double kd = 0.0;
 
 void loop(){
   currentTime = millis();
   if (currentTime - lastTime > DT_MILLIS) {
-      IMU1.getMotion6(&aX, &aY, &aZ, &gyrX, &gyrY, &gyrZ);
-
-      pitch += (float) (gyrX/GYROSCOPE_S) * dT;
-      roll += (float) (gyrY/GYROSCOPE_S) * dT;
-
-      mag = abs(aX) + abs(aY) + abs(aZ);
-      if (mag > 8192 && mag < 32768) {
-      pitchAcc = atan2f((float)aY, (float)aZ) * 180 / M_PI;
-      pitch = pitch * 0.96 + pitchAcc * 0.04;
-
-      // Turning around the Y axis results in a vector on the X-axis
-      rollAcc = atan2f((float)aX, (float)aZ) * 180 / M_PI;
-      roll = roll * 0.98 + rollAcc * 0.02;
-      Serial.println(pitch);
-    }
-    lastTime = currentTime;
+      complementaryFilter(&pitch, &roll);
+      error = (0.0 - pitch);
+      proportional = error * kp;
+      integral += ki * error * dT;
+      if (integral > maxOutput) 
+        integral = maxOutput;
+      else if (integral < minOutput) 
+        integral = minOutput;
+      derivative = kd * (error - lastError)/dT;
+      if (output > maxOutput) 
+        output = maxOutput;
+      else if (output < minOutput) 
+        output = minOutput;
+      output = proportional + integral + derivative;
+      leftStepper->setSpeed(output);
+      if (output > 0) {
+        leftStepper->runForward();
+      }
+      else if (output < 0) {
+        leftStepper->runBackward();
+      }
+      else {
+        leftStepper->move(0);
+      }
+      
+      
   }
 
   
